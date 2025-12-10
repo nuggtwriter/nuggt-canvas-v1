@@ -1,0 +1,5 @@
+{
+  "name": "ShadCN Shortcode Playground",
+  "description": "A real-time playground that transpiles a custom shortcode DSL into interactive mock ShadCN UI components.",
+  "requestFramePermissions": []
+}

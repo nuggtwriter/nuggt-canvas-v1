@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+
+    "analytics-mcp": {
+      "command": "pipx",
+      "args": [
+        "run",
+        "analytics-mcp"
+      ],
+      "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "/Users/tedmond/.config/gcloud/application_default_credentials.json",
+        "GOOGLE_PROJECT_ID": "nuggt-382817"
+      }
+    }
+  }
+}
+
+

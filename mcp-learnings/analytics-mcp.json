@@ -1,0 +1,3235 @@
+{
+  "mcpName": "analytics-mcp",
+  "version": "1.0",
+  "learnedAt": "2025-12-03T09:22:16.447Z",
+  "modelUsed": "claude-sonnet-4",
+  "originalTools": [
+    {
+      "name": "analytics-mcp__get_account_summaries",
+      "description": "Retrieves information about the user's Google Analytics accounts and properties."
+    },
+    {
+      "name": "analytics-mcp__list_google_ads_links",
+      "description": "Returns a list of links to Google Ads accounts for a property.\n\nArgs:\n    property_id: The Google Analytics property ID. Accepted formats are:\n      - A number\n      - A string consisting of 'properties/' followed by a number\n"
+    },
+    {
+      "name": "analytics-mcp__get_property_details",
+      "description": "Returns details about a property.\nArgs:\n    property_id: The Google Analytics property ID. Accepted formats are:\n      - A number\n      - A string consisting of 'properties/' followed by a number\n"
+    },
+    {
+      "name": "analytics-mcp__get_custom_dimensions_and_metrics",
+      "description": "Returns the property's custom dimensions and metrics.\n\nArgs:\n    property_id: The Google Analytics property ID. Accepted formats are:\n      - A number\n      - A string consisting of 'properties/' followed by a number\n\n"
+    },
+    {
+      "name": "analytics-mcp__run_realtime_report",
+      "description": "\n          Runs a Google Analytics Data API realtime report.\n\nSee\nhttps://developers.google.com/analytics/devguides/reporting/data/v1/realtime-basics\nfor more information.\n\nArgs:\n    property_id: The Google Analytics property ID. Accepted formats are:\n      - A number\n      - A string consisting of 'properties/' followed by a number\n    dimensions: A list of dimensions to include in the report. Dimensions must be realtime dimensions.\n    metrics: A list of metrics to include in the report. Metrics must be realtime metrics.\n    dimension_filter: A Data API FilterExpression\n      (https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/FilterExpression)\n      to apply to the dimensions.  Don't use this for filtering metrics. Use\n      metric_filter instead. The `field_name` in a `dimension_filter` must\n      be a dimension, as defined in the `get_standard_dimensions` and\n      `get_dimensions` tools.\n      For more information about the expected format of this argument, see\n      the `run_report_dimension_filter_hints` tool.\n    metric_filter: A Data API FilterExpression\n      (https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/FilterExpression)\n      to apply to the metrics.  Don't use this for filtering dimensions. Use\n      dimension_filter instead. The `field_name` in a `metric_filter` must\n      be a metric, as defined in the `get_standard_metrics` and\n      `get_metrics` tools.\n      For more information about the expected format of this argument, see\n      the `run_report_metric_filter_hints` tool.\n    order_bys: A list of Data API OrderBy\n      (https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/OrderBy)\n      objects to apply to the dimensions and metrics.\n      For more information about the expected format of this argument, see\n      the `run_report_order_bys_hints` tool.\n    limit: The maximum number of rows to return in each response. Value must\n      be a positive integer <= 250,000. Used to paginate through large\n      reports, following the guide at\n      https://developers.google.com/analytics/devguides/reporting/data/v1/basics#pagination.\n    offset: The row count of the start row. The first row is counted as row\n      0. Used to paginate through large\n      reports, following the guide at\n      https://developers.google.com/analytics/devguides/reporting/data/v1/basics#pagination.\n    return_property_quota: Whether to return realtime property quota in the response.\n\n\n          ## Hints for arguments\n\n          Here are some hints that outline the expected format and requirements\n          for arguments.\n\n          ### Hints for `dimensions`\n\n          The `dimensions` list must consist solely of either of the following:\n\n          1.  Realtime standard dimensions defined in the HTML table at\n              https://developers.google.com/analytics/devguides/reporting/data/v1/realtime-api-schema#dimensions.\n              These dimensions are available to *every* property.\n          2.  User-scoped custom dimensions for the `property_id`. Use the\n              `get_custom_dimensions_and_metrics` tool to retrieve the list of\n              custom dimensions for a property, and look for the custom\n              dimensions with an `apiName` that begins with \"customUser:\".\n\n          ### Hints for `metrics`\n\n          The `metrics` list must consist solely of the Realtime standard\n          metrics defined in the HTML table at\n          https://developers.google.com/analytics/devguides/reporting/data/v1/realtime-api-schema#metrics.\n          These metrics are available to *every* property.\n\n          Realtime reports can't use custom metrics.\n\n          ### Hints for `date_ranges`:\n          Example date_range arguments:\n      1. A single date range:\n\n        [ {\"start_date\": \"2025-01-01\", \"end_date\": \"2025-01-31\", \"name\": \"Jan2025\"} ]\n\n      2. A relative date range using 'yesterday' and 'today':\n        [ {\"start_date\": \"yesterday\", \"end_date\": \"today\", \"name\": \"YesterdayAndToday\"} ]\n\n      3. A relative date range using 'NdaysAgo' and 'today':\n        [ {\"start_date\": \"30daysAgo\", \"end_date\": \"yesterday\", \"name\": \"Previous30Days\"}]\n\n      4. Multiple date ranges:\n        [ {\"start_date\": \"2025-01-01\", \"end_date\": \"2025-01-31\", \"name\": \"Jan2025\"}, {\"start_date\": \"2025-02-01\", \"end_date\": \"2025-02-28\", \"name\": \"Feb2025\"} ]\n    \n\n          ### Hints for `dimension_filter`:\n          Example dimension_filter arguments:\n      1. A simple filter:\n        {\"filter\": {\"field_name\": \"eventName\", \"string_filter\": {\"match_type\": 2, \"value\": \"add\", \"case_sensitive\": false}}}\n\n      2. A NOT filter:\n        {\"not_expression\": {\"filter\": {\"field_name\": \"eventName\", \"string_filter\": {\"match_type\": 2, \"value\": \"add\", \"case_sensitive\": false}}}}\n\n      3. An empty value filter:\n        {\"filter\": {\"field_name\": \"source\", \"empty_filter\": {}}}\n\n      4. An AND group filter:\n        {\"and_group\": {\"expressions\": [{\"filter\": {\"field_name\": \"sourceMedium\", \"string_filter\": {\"match_type\": 1, \"value\": \"google / cpc\", \"case_sensitive\": false}}}, {\"filter\": {\"field_name\": \"eventName\", \"in_list_filter\": {\"values\": [\"first_visit\", \"purchase\", \"add_to_cart\"], \"case_sensitive\": true}}}]}}\n\n      5. An OR group filter:\n        {\"or_group\": {\"expressions\": [{\"filter\": {\"field_name\": \"sourceMedium\", \"string_filter\": {\"match_type\": 1, \"value\": \"google / cpc\", \"case_sensitive\": false}}}, {\"filter\": {\"field_name\": \"eventName\", \"in_list_filter\": {\"values\": [\"first_visit\", \"purchase\", \"add_to_cart\"], \"case_sensitive\": true}}}]}}\n\n    \n  Notes:\n    The API applies the `dimension_filter` and `metric_filter`\n    independently. As a result, some complex combinations of dimension and\n    metric filters are not possible in a single report request.\n\n    For example, you can't create a `dimension_filter` and `metric_filter`\n    combination for the following condition:\n\n    (\n      (eventName = \"page_view\" AND eventCount > 100)\n      OR\n      (eventName = \"join_group\" AND eventCount < 50)\n    )\n\n    This isn't possible because there's no way to apply the condition\n    \"eventCount > 100\" only to the data with eventName of \"page_view\", and\n    the condition \"eventCount < 50\" only to the data with eventName of\n    \"join_group\".\n\n    More generally, you can't define a `dimension_filter` and `metric_filter`\n    for:\n\n    (\n      ((dimension condition D1) AND (metric condition M1))\n      OR\n      ((dimension condition D2) AND (metric condition M2))\n    )\n\n    If you have complex conditions like this, either:\n\n    a)  Run a single report that applies a subset of the conditions that\n        the API supports as well as the data needed to perform filtering of the\n        API response on the client side. For example, for the condition:\n        (\n          (eventName = \"page_view\" AND eventCount > 100)\n          OR\n          (eventName = \"join_group\" AND eventCount < 50)\n        )\n        You could run a report that filters only on:\n        eventName one of \"page_view\" or \"join_group\"\n        and include the eventCount metric, then filter the API response on the\n        client side to apply the different metric filters for the different\n        events.\n\n    or\n\n    b)  Run a separate report for each combination of dimension condition and\n        metric condition. For the example above, you'd run one report for the\n        combination of (D1 AND M1), and another report for the combination of\n        (D2 AND M2).\n\n    Try to run fewer reports (option a) if possible. However, if running\n    fewer reports results in excessive quota usage for the API, use option\n    b. More information on quota usage is at\n    https://developers.google.com/analytics/blog/2023/data-api-quota-management.\n  \n\n          ### Hints for `metric_filter`:\n          Example metric_filter arguments:\n      1. A simple filter:\n        {\"filter\": {\"field_name\": \"eventCount\", \"numeric_filter\": {\"operation\": 4, \"value\": {\"int64_value\": \"10\"}}}}\n\n      2. A NOT filter:\n        {\"not_expression\": {\"filter\": {\"field_name\": \"eventCount\", \"numeric_filter\": {\"operation\": 4, \"value\": {\"int64_value\": \"10\"}}}}}\n\n      3. An empty value filter:\n        {\"filter\": {\"field_name\": \"purchaseRevenue\", \"empty_filter\": {}}}\n\n      4. An AND group filter:\n        {\"and_group\": {\"expressions\": [{\"filter\": {\"field_name\": \"eventCount\", \"numeric_filter\": {\"operation\": 4, \"value\": {\"int64_value\": \"10\"}}}}, {\"filter\": {\"field_name\": \"purchaseRevenue\", \"between_filter\": {\"from_value\": {\"double_value\": 10.0}, \"to_value\": {\"double_value\": 25.0}}}}]}}\n\n      5. An OR group filter:\n        {\"or_group\": {\"expressions\": [{\"filter\": {\"field_name\": \"eventCount\", \"numeric_filter\": {\"operation\": 4, \"value\": {\"int64_value\": \"10\"}}}}, {\"filter\": {\"field_name\": \"purchaseRevenue\", \"between_filter\": {\"from_value\": {\"double_value\": 10.0}, \"to_value\": {\"double_value\": 25.0}}}}]}}\n\n    \n  Notes:\n    The API applies the `dimension_filter` and `metric_filter`\n    independently. As a result, some complex combinations of dimension and\n    metric filters are not possible in a single report request.\n\n    For example, you can't create a `dimension_filter` and `metric_filter`\n    combination for the following condition:\n\n    (\n      (eventName = \"page_view\" AND eventCount > 100)\n      OR\n      (eventName = \"join_group\" AND eventCount < 50)\n    )\n\n    This isn't possible because there's no way to apply the condition\n    \"eventCount > 100\" only to the data with eventName of \"page_view\", and\n    the condition \"eventCount < 50\" only to the data with eventName of\n    \"join_group\".\n\n    More generally, you can't define a `dimension_filter` and `metric_filter`\n    for:\n\n    (\n      ((dimension condition D1) AND (metric condition M1))\n      OR\n      ((dimension condition D2) AND (metric condition M2))\n    )\n\n    If you have complex conditions like this, either:\n\n    a)  Run a single report that applies a subset of the conditions that\n        the API supports as well as the data needed to perform filtering of the\n        API response on the client side. For example, for the condition:\n        (\n          (eventName = \"page_view\" AND eventCount > 100)\n          OR\n          (eventName = \"join_group\" AND eventCount < 50)\n        )\n        You could run a report that filters only on:\n        eventName one of \"page_view\" or \"join_group\"\n        and include the eventCount metric, then filter the API response on the\n        client side to apply the different metric filters for the different\n        events.\n\n    or\n\n    b)  Run a separate report for each combination of dimension condition and\n        metric condition. For the example above, you'd run one report for the\n        combination of (D1 AND M1), and another report for the combination of\n        (D2 AND M2).\n\n    Try to run fewer reports (option a) if possible. However, if running\n    fewer reports results in excessive quota usage for the API, use option\n    b. More information on quota usage is at\n    https://developers.google.com/analytics/blog/2023/data-api-quota-management.\n  \n\n          ### Hints for `order_bys`:\n          Example order_bys arguments:\n\n    1.  Order by ascending 'eventName':\n        [ {\"dimension\": {\"dimension_name\": \"eventName\", \"order_type\": 1}, \"desc\": false} ]\n\n    2.  Order by descending 'eventName', ignoring case:\n        [ {\"dimension\": {\"dimension_name\": \"campaignName\", \"order_type\": 2}, \"desc\": true} ]\n\n    3.  Order by ascending 'audienceId':\n        [ {\"dimension\": {\"dimension_name\": \"audienceId\", \"order_type\": 3}, \"desc\": false} ]\n\n    4.  Order by descending 'eventCount':\n        [ {\"metric\": {\"metric_name\": \"eventValue\"}, \"desc\": true} ]\n\n    5.  Order by ascending 'eventCount':\n        [ {\"metric\": {\"metric_name\": \"eventCount\"}, \"desc\": false} ]\n\n    6.  Combination of dimension and metric order bys:\n        [\n          {\"dimension\": {\"dimension_name\": \"eventName\", \"order_type\": 1}, \"desc\": false},\n          {\"metric\": {\"metric_name\": \"eventValue\"}, \"desc\": true},\n        ]\n\n    7.  Order by multiple dimensions and metrics:\n        [\n          {\"dimension\": {\"dimension_name\": \"eventName\", \"order_type\": 1}, \"desc\": false},\n          {\"dimension\": {\"dimension_name\": \"audienceId\", \"order_type\": 3}, \"desc\": false},\n          {\"metric\": {\"metric_name\": \"eventValue\"}, \"desc\": true},\n        ]\n\n    The dimensions and metrics in order_bys must also be present in the report\n    request's \"dimensions\" and \"metrics\" arguments, respectively.\n    \n\n"
+    },
+    {
+      "name": "analytics-mcp__run_report",
+      "description": "\n          Runs a Google Analytics Data API report.\n\nNote that the reference docs at\nhttps://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta\nall use camelCase field names, but field names passed to this method should\nbe in snake_case since the tool is using the protocol buffers (protobuf)\nformat. The protocol buffers for the Data API are available at\nhttps://github.com/googleapis/googleapis/tree/master/google/analytics/data/v1beta.\n\nArgs:\n    property_id: The Google Analytics property ID. Accepted formats are:\n      - A number\n      - A string consisting of 'properties/' followed by a number\n    date_ranges: A list of date ranges\n      (https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/DateRange)\n      to include in the report.\n    dimensions: A list of dimensions to include in the report.\n    metrics: A list of metrics to include in the report.\n    dimension_filter: A Data API FilterExpression\n      (https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/FilterExpression)\n      to apply to the dimensions.  Don't use this for filtering metrics. Use\n      metric_filter instead. The `field_name` in a `dimension_filter` must\n      be a dimension, as defined in the `get_standard_dimensions` and\n      `get_dimensions` tools.\n    metric_filter: A Data API FilterExpression\n      (https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/FilterExpression)\n      to apply to the metrics.  Don't use this for filtering dimensions. Use\n      dimension_filter instead. The `field_name` in a `metric_filter` must\n      be a metric, as defined in the `get_standard_metrics` and\n      `get_metrics` tools.\n    order_bys: A list of Data API OrderBy\n      (https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/OrderBy)\n      objects to apply to the dimensions and metrics.\n    limit: The maximum number of rows to return in each response. Value must\n      be a positive integer <= 250,000. Used to paginate through large\n      reports, following the guide at\n      https://developers.google.com/analytics/devguides/reporting/data/v1/basics#pagination.\n    offset: The row count of the start row. The first row is counted as row\n      0. Used to paginate through large\n      reports, following the guide at\n      https://developers.google.com/analytics/devguides/reporting/data/v1/basics#pagination.\n    currency_code: The currency code to use for currency values. Must be in\n      ISO4217 format, such as \"AED\", \"USD\", \"JPY\". If the field is empty, the\n      report uses the property's default currency.\n    return_property_quota: Whether to return property quota in the response.\n\n\n          ## Hints for arguments\n\n          Here are some hints that outline the expected format and requirements\n          for arguments.\n\n          ### Hints for `dimensions`\n\n          The `dimensions` list must consist solely of either of the following:\n\n          1.  Standard dimensions defined in the HTML table at\n              https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema#dimensions.\n              These dimensions are available to *every* property.\n          2.  Custom dimensions for the `property_id`. Use the\n              `get_custom_dimensions_and_metrics` tool to retrieve the list of\n              custom dimensions for a property.\n\n          ### Hints for `metrics`\n\n          The `metrics` list must consist solely of either of the following:\n\n          1.  Standard metrics defined in the HTML table at\n              https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema#metrics.\n              These metrics are available to *every* property.\n          2.  Custom metrics for the `property_id`. Use the\n              `get_custom_dimensions_and_metrics` tool to retrieve the list of\n              custom metrics for a property.\n\n\n          ### Hints for `date_ranges`:\n          Example date_range arguments:\n      1. A single date range:\n\n        [ {\"start_date\": \"2025-01-01\", \"end_date\": \"2025-01-31\", \"name\": \"Jan2025\"} ]\n\n      2. A relative date range using 'yesterday' and 'today':\n        [ {\"start_date\": \"yesterday\", \"end_date\": \"today\", \"name\": \"YesterdayAndToday\"} ]\n\n      3. A relative date range using 'NdaysAgo' and 'today':\n        [ {\"start_date\": \"30daysAgo\", \"end_date\": \"yesterday\", \"name\": \"Previous30Days\"}]\n\n      4. Multiple date ranges:\n        [ {\"start_date\": \"2025-01-01\", \"end_date\": \"2025-01-31\", \"name\": \"Jan2025\"}, {\"start_date\": \"2025-02-01\", \"end_date\": \"2025-02-28\", \"name\": \"Feb2025\"} ]\n    \n\n          ### Hints for `dimension_filter`:\n          Example dimension_filter arguments:\n      1. A simple filter:\n        {\"filter\": {\"field_name\": \"eventName\", \"string_filter\": {\"match_type\": 2, \"value\": \"add\", \"case_sensitive\": false}}}\n\n      2. A NOT filter:\n        {\"not_expression\": {\"filter\": {\"field_name\": \"eventName\", \"string_filter\": {\"match_type\": 2, \"value\": \"add\", \"case_sensitive\": false}}}}\n\n      3. An empty value filter:\n        {\"filter\": {\"field_name\": \"source\", \"empty_filter\": {}}}\n\n      4. An AND group filter:\n        {\"and_group\": {\"expressions\": [{\"filter\": {\"field_name\": \"sourceMedium\", \"string_filter\": {\"match_type\": 1, \"value\": \"google / cpc\", \"case_sensitive\": false}}}, {\"filter\": {\"field_name\": \"eventName\", \"in_list_filter\": {\"values\": [\"first_visit\", \"purchase\", \"add_to_cart\"], \"case_sensitive\": true}}}]}}\n\n      5. An OR group filter:\n        {\"or_group\": {\"expressions\": [{\"filter\": {\"field_name\": \"sourceMedium\", \"string_filter\": {\"match_type\": 1, \"value\": \"google / cpc\", \"case_sensitive\": false}}}, {\"filter\": {\"field_name\": \"eventName\", \"in_list_filter\": {\"values\": [\"first_visit\", \"purchase\", \"add_to_cart\"], \"case_sensitive\": true}}}]}}\n\n    \n  Notes:\n    The API applies the `dimension_filter` and `metric_filter`\n    independently. As a result, some complex combinations of dimension and\n    metric filters are not possible in a single report request.\n\n    For example, you can't create a `dimension_filter` and `metric_filter`\n    combination for the following condition:\n\n    (\n      (eventName = \"page_view\" AND eventCount > 100)\n      OR\n      (eventName = \"join_group\" AND eventCount < 50)\n    )\n\n    This isn't possible because there's no way to apply the condition\n    \"eventCount > 100\" only to the data with eventName of \"page_view\", and\n    the condition \"eventCount < 50\" only to the data with eventName of\n    \"join_group\".\n\n    More generally, you can't define a `dimension_filter` and `metric_filter`\n    for:\n\n    (\n      ((dimension condition D1) AND (metric condition M1))\n      OR\n      ((dimension condition D2) AND (metric condition M2))\n    )\n\n    If you have complex conditions like this, either:\n\n    a)  Run a single report that applies a subset of the conditions that\n        the API supports as well as the data needed to perform filtering of the\n        API response on the client side. For example, for the condition:\n        (\n          (eventName = \"page_view\" AND eventCount > 100)\n          OR\n          (eventName = \"join_group\" AND eventCount < 50)\n        )\n        You could run a report that filters only on:\n        eventName one of \"page_view\" or \"join_group\"\n        and include the eventCount metric, then filter the API response on the\n        client side to apply the different metric filters for the different\n        events.\n\n    or\n\n    b)  Run a separate report for each combination of dimension condition and\n        metric condition. For the example above, you'd run one report for the\n        combination of (D1 AND M1), and another report for the combination of\n        (D2 AND M2).\n\n    Try to run fewer reports (option a) if possible. However, if running\n    fewer reports results in excessive quota usage for the API, use option\n    b. More information on quota usage is at\n    https://developers.google.com/analytics/blog/2023/data-api-quota-management.\n  \n\n          ### Hints for `metric_filter`:\n          Example metric_filter arguments:\n      1. A simple filter:\n        {\"filter\": {\"field_name\": \"eventCount\", \"numeric_filter\": {\"operation\": 4, \"value\": {\"int64_value\": \"10\"}}}}\n\n      2. A NOT filter:\n        {\"not_expression\": {\"filter\": {\"field_name\": \"eventCount\", \"numeric_filter\": {\"operation\": 4, \"value\": {\"int64_value\": \"10\"}}}}}\n\n      3. An empty value filter:\n        {\"filter\": {\"field_name\": \"purchaseRevenue\", \"empty_filter\": {}}}\n\n      4. An AND group filter:\n        {\"and_group\": {\"expressions\": [{\"filter\": {\"field_name\": \"eventCount\", \"numeric_filter\": {\"operation\": 4, \"value\": {\"int64_value\": \"10\"}}}}, {\"filter\": {\"field_name\": \"purchaseRevenue\", \"between_filter\": {\"from_value\": {\"double_value\": 10.0}, \"to_value\": {\"double_value\": 25.0}}}}]}}\n\n      5. An OR group filter:\n        {\"or_group\": {\"expressions\": [{\"filter\": {\"field_name\": \"eventCount\", \"numeric_filter\": {\"operation\": 4, \"value\": {\"int64_value\": \"10\"}}}}, {\"filter\": {\"field_name\": \"purchaseRevenue\", \"between_filter\": {\"from_value\": {\"double_value\": 10.0}, \"to_value\": {\"double_value\": 25.0}}}}]}}\n\n    \n  Notes:\n    The API applies the `dimension_filter` and `metric_filter`\n    independently. As a result, some complex combinations of dimension and\n    metric filters are not possible in a single report request.\n\n    For example, you can't create a `dimension_filter` and `metric_filter`\n    combination for the following condition:\n\n    (\n      (eventName = \"page_view\" AND eventCount > 100)\n      OR\n      (eventName = \"join_group\" AND eventCount < 50)\n    )\n\n    This isn't possible because there's no way to apply the condition\n    \"eventCount > 100\" only to the data with eventName of \"page_view\", and\n    the condition \"eventCount < 50\" only to the data with eventName of\n    \"join_group\".\n\n    More generally, you can't define a `dimension_filter` and `metric_filter`\n    for:\n\n    (\n      ((dimension condition D1) AND (metric condition M1))\n      OR\n      ((dimension condition D2) AND (metric condition M2))\n    )\n\n    If you have complex conditions like this, either:\n\n    a)  Run a single report that applies a subset of the conditions that\n        the API supports as well as the data needed to perform filtering of the\n        API response on the client side. For example, for the condition:\n        (\n          (eventName = \"page_view\" AND eventCount > 100)\n          OR\n          (eventName = \"join_group\" AND eventCount < 50)\n        )\n        You could run a report that filters only on:\n        eventName one of \"page_view\" or \"join_group\"\n        and include the eventCount metric, then filter the API response on the\n        client side to apply the different metric filters for the different\n        events.\n\n    or\n\n    b)  Run a separate report for each combination of dimension condition and\n        metric condition. For the example above, you'd run one report for the\n        combination of (D1 AND M1), and another report for the combination of\n        (D2 AND M2).\n\n    Try to run fewer reports (option a) if possible. However, if running\n    fewer reports results in excessive quota usage for the API, use option\n    b. More information on quota usage is at\n    https://developers.google.com/analytics/blog/2023/data-api-quota-management.\n  \n\n          ### Hints for `order_bys`:\n          Example order_bys arguments:\n\n    1.  Order by ascending 'eventName':\n        [ {\"dimension\": {\"dimension_name\": \"eventName\", \"order_type\": 1}, \"desc\": false} ]\n\n    2.  Order by descending 'eventName', ignoring case:\n        [ {\"dimension\": {\"dimension_name\": \"campaignName\", \"order_type\": 2}, \"desc\": true} ]\n\n    3.  Order by ascending 'audienceId':\n        [ {\"dimension\": {\"dimension_name\": \"audienceId\", \"order_type\": 3}, \"desc\": false} ]\n\n    4.  Order by descending 'eventCount':\n        [ {\"metric\": {\"metric_name\": \"eventValue\"}, \"desc\": true} ]\n\n    5.  Order by ascending 'eventCount':\n        [ {\"metric\": {\"metric_name\": \"eventCount\"}, \"desc\": false} ]\n\n    6.  Combination of dimension and metric order bys:\n        [\n          {\"dimension\": {\"dimension_name\": \"eventName\", \"order_type\": 1}, \"desc\": false},\n          {\"metric\": {\"metric_name\": \"eventValue\"}, \"desc\": true},\n        ]\n\n    7.  Order by multiple dimensions and metrics:\n        [\n          {\"dimension\": {\"dimension_name\": \"eventName\", \"order_type\": 1}, \"desc\": false},\n          {\"dimension\": {\"dimension_name\": \"audienceId\", \"order_type\": 3}, \"desc\": false},\n          {\"metric\": {\"metric_name\": \"eventValue\"}, \"desc\": true},\n        ]\n\n    The dimensions and metrics in order_bys must also be present in the report\n    request's \"dimensions\" and \"metrics\" arguments, respectively.\n    \n\n          "
+    }
+  ],
+  "subTools": [
+    {
+      "id": "ga_list_accounts",
+      "name": "List GA Accounts",
+      "description": "Lists all Google Analytics accounts accessible to the user with their display names and IDs",
+      "parentTool": "analytics-mcp__get_account_summaries",
+      "parentToolDefaultArgs": {},
+      "requiresFirst": [],
+      "inputs": [],
+      "jsonPath": "$.result[*]",
+      "outputFields": [
+        {
+          "name": "account_id",
+          "path": "$.account",
+          "type": "string",
+          "description": "Full account ID (format: accounts/123456)"
+        },
+        {
+          "name": "display_name",
+          "path": "$.display_name",
+          "type": "string",
+          "description": "Human-readable account name"
+        },
+        {
+          "name": "property_count",
+          "path": "$.property_summaries.length",
+          "type": "number",
+          "description": "Number of properties in account"
+        }
+      ],
+      "outputExample": {
+        "account_id": "accounts/189921394",
+        "display_name": "DocPath",
+        "property_count": 4
+      }
+    },
+    {
+      "id": "ga_list_properties",
+      "name": "List GA Properties",
+      "description": "Lists all Google Analytics 4 properties with their IDs, names, and parent accounts. Property IDs are required for most other GA tools.",
+      "parentTool": "analytics-mcp__get_account_summaries",
+      "parentToolDefaultArgs": {},
+      "requiresFirst": [],
+      "inputs": [],
+      "jsonPath": "$.result[*].property_summaries[*]",
+      "outputFields": [
+        {
+          "name": "property_id",
+          "path": "$.property",
+          "type": "string",
+          "description": "Full property ID (format: properties/123456) - use this for other GA tools"
+        },
+        {
+          "name": "display_name",
+          "path": "$.display_name",
+          "type": "string",
+          "description": "Human-readable property name"
+        },
+        {
+          "name": "property_type",
+          "path": "$.property_type",
+          "type": "string",
+          "description": "Type of property (PROPERTY_TYPE_ORDINARY, etc.)"
+        },
+        {
+          "name": "parent_account",
+          "path": "$.parent",
+          "type": "string",
+          "description": "Parent account ID"
+        }
+      ],
+      "outputExample": {
+        "property_id": "properties/281869130",
+        "display_name": "www.docpath.com-all - GA4",
+        "property_type": "PROPERTY_TYPE_ORDINARY",
+        "parent_account": "accounts/189921394"
+      }
+    },
+    {
+      "id": "ga_get_property_details",
+      "name": "Get GA Property Details",
+      "description": "Gets detailed configuration information for a GA4 property including timezone, currency, industry category, and service level",
+      "parentTool": "analytics-mcp__get_property_details",
+      "parentToolDefaultArgs": {},
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id needed for this tool",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID to get details for",
+          "mapToParentArg": "property_id",
+          "source": {
+            "tool": "ga_list_properties",
+            "fromPath": "$.property"
+          }
+        }
+      ],
+      "jsonPath": "$.result",
+      "outputFields": [
+        {
+          "name": "name",
+          "path": "$.name",
+          "type": "string",
+          "description": "Full property resource name"
+        },
+        {
+          "name": "display_name",
+          "path": "$.display_name",
+          "type": "string",
+          "description": "Human-readable property name"
+        },
+        {
+          "name": "time_zone",
+          "path": "$.time_zone",
+          "type": "string",
+          "description": "Property timezone (IANA format, e.g., Europe/Madrid)"
+        },
+        {
+          "name": "currency_code",
+          "path": "$.currency_code",
+          "type": "string",
+          "description": "Default currency (ISO 4217 format, e.g., EUR, USD)"
+        },
+        {
+          "name": "industry_category",
+          "path": "$.industry_category",
+          "type": "string",
+          "description": "Industry vertical classification"
+        },
+        {
+          "name": "service_level",
+          "path": "$.service_level",
+          "type": "string",
+          "description": "GA service tier (GOOGLE_ANALYTICS_STANDARD or GOOGLE_ANALYTICS_360)"
+        },
+        {
+          "name": "property_type",
+          "path": "$.property_type",
+          "type": "string",
+          "description": "Type of property"
+        },
+        {
+          "name": "create_time",
+          "path": "$.create_time",
+          "type": "string",
+          "description": "When property was created (ISO 8601)"
+        },
+        {
+          "name": "update_time",
+          "path": "$.update_time",
+          "type": "string",
+          "description": "When property was last updated (ISO 8601)"
+        },
+        {
+          "name": "parent_account",
+          "path": "$.account",
+          "type": "string",
+          "description": "Parent account ID"
+        }
+      ],
+      "outputExample": {
+        "name": "properties/281869130",
+        "display_name": "www.docpath.com-all - GA4",
+        "time_zone": "Europe/Madrid",
+        "currency_code": "EUR",
+        "industry_category": "BUSINESS_AND_INDUSTRIAL_MARKETS",
+        "service_level": "GOOGLE_ANALYTICS_STANDARD",
+        "property_type": "PROPERTY_TYPE_ORDINARY",
+        "create_time": "2021-08-05T09:46:35.285Z",
+        "update_time": "2025-04-12T10:49:10.814Z",
+        "parent_account": "accounts/189921394"
+      }
+    },
+    {
+      "id": "ga_list_google_ads_links",
+      "name": "List Google Ads Links",
+      "description": "Lists all Google Ads accounts linked to a GA4 property, including customer IDs, personalization settings, and who created the link",
+      "parentTool": "analytics-mcp__list_google_ads_links",
+      "parentToolDefaultArgs": {},
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id needed for this tool",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID to list Google Ads links for",
+          "mapToParentArg": "property_id",
+          "source": {
+            "tool": "ga_list_properties",
+            "fromPath": "$.property"
+          }
+        }
+      ],
+      "jsonPath": "$.result[*]",
+      "outputFields": [
+        {
+          "name": "link_name",
+          "path": "$.name",
+          "type": "string",
+          "description": "Full resource name of the Google Ads link"
+        },
+        {
+          "name": "customer_id",
+          "path": "$.customer_id",
+          "type": "string",
+          "description": "Google Ads customer ID (10-digit number without dashes)"
+        },
+        {
+          "name": "ads_personalization_enabled",
+          "path": "$.ads_personalization_enabled",
+          "type": "boolean",
+          "description": "Whether ads personalization is enabled for this link"
+        },
+        {
+          "name": "can_manage_clients",
+          "path": "$.can_manage_clients",
+          "type": "boolean",
+          "description": "Whether the linked account is a manager account"
+        },
+        {
+          "name": "creator_email",
+          "path": "$.creator_email_address",
+          "type": "string",
+          "description": "Email of person who created the link"
+        },
+        {
+          "name": "create_time",
+          "path": "$.create_time",
+          "type": "string",
+          "description": "When the link was created (ISO 8601)"
+        }
+      ],
+      "outputExample": {
+        "link_name": "properties/315117038/googleAdsLinks/8135258793",
+        "customer_id": "1879379756",
+        "ads_personalization_enabled": true,
+        "can_manage_clients": false,
+        "creator_email": "kflai@jayoninc.com",
+        "create_time": "2024-05-10T09:43:10.717Z"
+      }
+    },
+    {
+      "id": "ga_get_custom_dimensions",
+      "name": "Get Custom Dimensions",
+      "description": "Gets all custom dimensions defined for a GA4 property. Custom dimensions have api_name values that can be used in reports (e.g., customEvent:event_category, customUser:user_tier)",
+      "parentTool": "analytics-mcp__get_custom_dimensions_and_metrics",
+      "parentToolDefaultArgs": {},
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id needed for this tool",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID to get custom dimensions for",
+          "mapToParentArg": "property_id",
+          "source": {
+            "tool": "ga_list_properties",
+            "fromPath": "$.property"
+          }
+        }
+      ],
+      "jsonPath": "$.result.custom_dimensions[*]",
+      "outputFields": [
+        {
+          "name": "api_name",
+          "path": "$.api_name",
+          "type": "string",
+          "description": "API name to use in reports (e.g., customEvent:event_category)"
+        },
+        {
+          "name": "ui_name",
+          "path": "$.ui_name",
+          "type": "string",
+          "description": "Display name shown in GA UI"
+        },
+        {
+          "name": "description",
+          "path": "$.description",
+          "type": "string",
+          "description": "Description of the custom dimension"
+        },
+        {
+          "name": "category",
+          "path": "$.category",
+          "type": "string",
+          "description": "Scope category (Event-scoped, User-scoped, Item-scoped)"
+        }
+      ],
+      "outputExample": {
+        "api_name": "customEvent:event_category",
+        "ui_name": "Event Category",
+        "description": "An event scoped custom dimension for your Analytics property.",
+        "category": "Event-scoped Custom Dimension"
+      }
+    },
+    {
+      "id": "ga_get_custom_metrics",
+      "name": "Get Custom Metrics",
+      "description": "Gets all custom metrics defined for a GA4 property. Custom metrics have api_name values that can be used in reports.",
+      "parentTool": "analytics-mcp__get_custom_dimensions_and_metrics",
+      "parentToolDefaultArgs": {},
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id needed for this tool",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID to get custom metrics for",
+          "mapToParentArg": "property_id",
+          "source": {
+            "tool": "ga_list_properties",
+            "fromPath": "$.property"
+          }
+        }
+      ],
+      "jsonPath": "$.result.custom_metrics[*]",
+      "outputFields": [
+        {
+          "name": "api_name",
+          "path": "$.api_name",
+          "type": "string",
+          "description": "API name to use in reports"
+        },
+        {
+          "name": "ui_name",
+          "path": "$.ui_name",
+          "type": "string",
+          "description": "Display name shown in GA UI"
+        },
+        {
+          "name": "description",
+          "path": "$.description",
+          "type": "string",
+          "description": "Description of the custom metric"
+        },
+        {
+          "name": "measurement_unit",
+          "path": "$.measurement_unit",
+          "type": "string",
+          "description": "Unit of measurement (STANDARD, CURRENCY, FEET, METERS, KILOMETERS, MILES, MILLISECONDS, SECONDS, MINUTES, HOURS)"
+        }
+      ],
+      "outputExample": {
+        "api_name": "customEvent:engagement_score",
+        "ui_name": "Engagement Score",
+        "description": "Custom engagement metric",
+        "measurement_unit": "STANDARD"
+      }
+    },
+    {
+      "id": "ga_realtime_active_users_by_country",
+      "name": "Realtime Active Users by Country",
+      "description": "Shows currently active users broken down by country - useful for monitoring live global traffic",
+      "parentTool": "analytics-mcp__run_realtime_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "country"
+        ],
+        "metrics": [
+          "activeUsers"
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id needed for this tool",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false,
+          "description": "Maximum number of countries to return",
+          "mapToParentArg": "limit"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "country",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "Country name"
+        },
+        {
+          "name": "active_users",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Number of active users"
+        }
+      ],
+      "outputExample": {
+        "country": "United States",
+        "active_users": "42"
+      }
+    },
+    {
+      "id": "ga_realtime_active_users_by_page",
+      "name": "Realtime Active Users by Page",
+      "description": "Shows which pages/screens have active users right now - useful for monitoring content engagement in real-time",
+      "parentTool": "analytics-mcp__run_realtime_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "unifiedScreenName"
+        ],
+        "metrics": [
+          "activeUsers",
+          "screenPageViews"
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id needed for this tool",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false,
+          "description": "Maximum number of pages to return",
+          "mapToParentArg": "limit"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "page_title",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "Page title or screen name"
+        },
+        {
+          "name": "active_users",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Number of active users"
+        },
+        {
+          "name": "page_views",
+          "path": "$.metric_values[1].value",
+          "type": "string",
+          "description": "Number of page views"
+        }
+      ],
+      "outputExample": {
+        "page_title": "Home Page | My Site",
+        "active_users": "15",
+        "page_views": "23"
+      }
+    },
+    {
+      "id": "ga_realtime_events",
+      "name": "Realtime Events",
+      "description": "Shows events happening in real-time with their counts - useful for monitoring conversions and user actions live",
+      "parentTool": "analytics-mcp__run_realtime_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "eventName"
+        ],
+        "metrics": [
+          "eventCount"
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id needed for this tool",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false,
+          "description": "Maximum number of events to return",
+          "mapToParentArg": "limit"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "event_name",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "Event name (page_view, purchase, etc.)"
+        },
+        {
+          "name": "event_count",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Number of times event occurred"
+        }
+      ],
+      "outputExample": {
+        "event_name": "page_view",
+        "event_count": "156"
+      }
+    },
+    {
+      "id": "ga_realtime_trend_by_minute",
+      "name": "Realtime Trend by Minute",
+      "description": "Shows active users and events per minute for the last 30 minutes - useful for spotting traffic spikes or drops",
+      "parentTool": "analytics-mcp__run_realtime_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "minutesAgo"
+        ],
+        "metrics": [
+          "activeUsers",
+          "eventCount"
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id needed for this tool",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "minutes_ago",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "Minutes ago (00-29)"
+        },
+        {
+          "name": "active_users",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Active users at that minute"
+        },
+        {
+          "name": "event_count",
+          "path": "$.metric_values[1].value",
+          "type": "string",
+          "description": "Events at that minute"
+        }
+      ],
+      "outputExample": {
+        "minutes_ago": "05",
+        "active_users": "12",
+        "event_count": "45"
+      }
+    },
+    {
+      "id": "ga_traffic_sources_report",
+      "name": "Traffic Sources Report",
+      "description": "Shows where your traffic comes from - sources, mediums, and channels with engagement metrics. Essential for understanding marketing effectiveness.",
+      "parentTool": "analytics-mcp__run_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "sessionSource",
+          "sessionMedium"
+        ],
+        "metrics": [
+          "sessions",
+          "totalUsers",
+          "newUsers",
+          "engagementRate",
+          "averageSessionDuration"
+        ],
+        "order_bys": [
+          {
+            "metric": {
+              "metric_name": "sessions"
+            },
+            "desc": true
+          }
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id needed for this tool",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "start_date",
+          "type": "string",
+          "required": true,
+          "description": "Start date (YYYY-MM-DD or '30daysAgo')",
+          "mapToParentArg": "date_ranges[0].start_date"
+        },
+        {
+          "name": "end_date",
+          "type": "string",
+          "required": true,
+          "description": "End date (YYYY-MM-DD or 'yesterday')",
+          "mapToParentArg": "date_ranges[0].end_date"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false,
+          "description": "Max sources to return",
+          "mapToParentArg": "limit"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "source",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "Traffic source"
+        },
+        {
+          "name": "medium",
+          "path": "$.dimension_values[1].value",
+          "type": "string",
+          "description": "Traffic medium"
+        },
+        {
+          "name": "sessions",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Sessions"
+        },
+        {
+          "name": "total_users",
+          "path": "$.metric_values[1].value",
+          "type": "string",
+          "description": "Total users"
+        },
+        {
+          "name": "new_users",
+          "path": "$.metric_values[2].value",
+          "type": "string",
+          "description": "New users"
+        },
+        {
+          "name": "engagement_rate",
+          "path": "$.metric_values[3].value",
+          "type": "string",
+          "description": "Engagement rate (0-1)"
+        },
+        {
+          "name": "avg_session_duration",
+          "path": "$.metric_values[4].value",
+          "type": "string",
+          "description": "Avg session duration (seconds)"
+        }
+      ],
+      "outputExample": {
+        "source": "google",
+        "medium": "organic",
+        "sessions": "527",
+        "total_users": "396",
+        "new_users": "371",
+        "engagement_rate": "0.57",
+        "avg_session_duration": "45.2"
+      }
+    },
+    {
+      "id": "ga_page_performance_report",
+      "name": "Page Performance Report",
+      "description": "Shows performance metrics for each page - sessions, bounce rate, and time on page. Essential for content optimization.",
+      "parentTool": "analytics-mcp__run_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "pagePath"
+        ],
+        "metrics": [
+          "sessions",
+          "screenPageViews",
+          "bounceRate",
+          "averageSessionDuration",
+          "engagementRate"
+        ],
+        "order_bys": [
+          {
+            "metric": {
+              "metric_name": "sessions"
+            },
+            "desc": true
+          }
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "start_date",
+          "type": "string",
+          "required": true,
+          "description": "Start date",
+          "mapToParentArg": "date_ranges[0].start_date"
+        },
+        {
+          "name": "end_date",
+          "type": "string",
+          "required": true,
+          "description": "End date",
+          "mapToParentArg": "date_ranges[0].end_date"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false,
+          "description": "Max pages to return",
+          "mapToParentArg": "limit"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "page_path",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "URL path"
+        },
+        {
+          "name": "sessions",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Sessions"
+        },
+        {
+          "name": "page_views",
+          "path": "$.metric_values[1].value",
+          "type": "string",
+          "description": "Page views"
+        },
+        {
+          "name": "bounce_rate",
+          "path": "$.metric_values[2].value",
+          "type": "string",
+          "description": "Bounce rate (0-1)"
+        },
+        {
+          "name": "avg_session_duration",
+          "path": "$.metric_values[3].value",
+          "type": "string",
+          "description": "Avg duration (seconds)"
+        },
+        {
+          "name": "engagement_rate",
+          "path": "$.metric_values[4].value",
+          "type": "string",
+          "description": "Engagement rate (0-1)"
+        }
+      ],
+      "outputExample": {
+        "page_path": "/blog/article-1",
+        "sessions": "1568",
+        "page_views": "2100",
+        "bounce_rate": "0.88",
+        "avg_session_duration": "37.4",
+        "engagement_rate": "0.12"
+      }
+    },
+    {
+      "id": "ga_geographic_report",
+      "name": "Geographic Report",
+      "description": "Shows traffic and engagement by country - useful for understanding your global audience.",
+      "parentTool": "analytics-mcp__run_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "country"
+        ],
+        "metrics": [
+          "sessions",
+          "totalUsers",
+          "newUsers",
+          "engagementRate",
+          "averageSessionDuration"
+        ],
+        "order_bys": [
+          {
+            "metric": {
+              "metric_name": "sessions"
+            },
+            "desc": true
+          }
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "start_date",
+          "type": "string",
+          "required": true,
+          "description": "Start date",
+          "mapToParentArg": "date_ranges[0].start_date"
+        },
+        {
+          "name": "end_date",
+          "type": "string",
+          "required": true,
+          "description": "End date",
+          "mapToParentArg": "date_ranges[0].end_date"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false,
+          "description": "Max countries to return",
+          "mapToParentArg": "limit"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "country",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "Country name"
+        },
+        {
+          "name": "sessions",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Sessions"
+        },
+        {
+          "name": "total_users",
+          "path": "$.metric_values[1].value",
+          "type": "string",
+          "description": "Total users"
+        },
+        {
+          "name": "new_users",
+          "path": "$.metric_values[2].value",
+          "type": "string",
+          "description": "New users"
+        },
+        {
+          "name": "engagement_rate",
+          "path": "$.metric_values[3].value",
+          "type": "string",
+          "description": "Engagement rate"
+        },
+        {
+          "name": "avg_session_duration",
+          "path": "$.metric_values[4].value",
+          "type": "string",
+          "description": "Avg duration"
+        }
+      ],
+      "outputExample": {
+        "country": "United States",
+        "sessions": "692",
+        "total_users": "677",
+        "engagement_rate": "0.42",
+        "avg_session_duration": "23.4"
+      }
+    },
+    {
+      "id": "ga_device_report",
+      "name": "Device Category Report",
+      "description": "Shows traffic and engagement by device type (desktop, mobile, tablet) - essential for responsive design decisions.",
+      "parentTool": "analytics-mcp__run_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "deviceCategory"
+        ],
+        "metrics": [
+          "sessions",
+          "totalUsers",
+          "bounceRate",
+          "engagementRate",
+          "averageSessionDuration",
+          "screenPageViewsPerSession"
+        ],
+        "order_bys": [
+          {
+            "metric": {
+              "metric_name": "sessions"
+            },
+            "desc": true
+          }
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "start_date",
+          "type": "string",
+          "required": true,
+          "description": "Start date",
+          "mapToParentArg": "date_ranges[0].start_date"
+        },
+        {
+          "name": "end_date",
+          "type": "string",
+          "required": true,
+          "description": "End date",
+          "mapToParentArg": "date_ranges[0].end_date"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "device_category",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "Device type"
+        },
+        {
+          "name": "sessions",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Sessions"
+        },
+        {
+          "name": "total_users",
+          "path": "$.metric_values[1].value",
+          "type": "string",
+          "description": "Users"
+        },
+        {
+          "name": "bounce_rate",
+          "path": "$.metric_values[2].value",
+          "type": "string",
+          "description": "Bounce rate"
+        },
+        {
+          "name": "engagement_rate",
+          "path": "$.metric_values[3].value",
+          "type": "string",
+          "description": "Engagement rate"
+        },
+        {
+          "name": "avg_session_duration",
+          "path": "$.metric_values[4].value",
+          "type": "string",
+          "description": "Avg duration"
+        },
+        {
+          "name": "pages_per_session",
+          "path": "$.metric_values[5].value",
+          "type": "string",
+          "description": "Pages per session"
+        }
+      ],
+      "outputExample": {
+        "device_category": "mobile",
+        "sessions": "3500",
+        "total_users": "3200",
+        "bounce_rate": "0.65",
+        "engagement_rate": "0.35",
+        "avg_session_duration": "25.0",
+        "pages_per_session": "1.5"
+      }
+    },
+    {
+      "id": "ga_events_report",
+      "name": "Events Report",
+      "description": "Shows all events tracked on the property with counts and user engagement - essential for conversion tracking.",
+      "parentTool": "analytics-mcp__run_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "eventName"
+        ],
+        "metrics": [
+          "eventCount",
+          "totalUsers",
+          "eventCountPerUser"
+        ],
+        "order_bys": [
+          {
+            "metric": {
+              "metric_name": "eventCount"
+            },
+            "desc": true
+          }
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get the property_id",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "start_date",
+          "type": "string",
+          "required": true,
+          "description": "Start date",
+          "mapToParentArg": "date_ranges[0].start_date"
+        },
+        {
+          "name": "end_date",
+          "type": "string",
+          "required": true,
+          "description": "End date",
+          "mapToParentArg": "date_ranges[0].end_date"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false,
+          "description": "Max events to return",
+          "mapToParentArg": "limit"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "event_name",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "Event name"
+        },
+        {
+          "name": "event_count",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Total occurrences"
+        },
+        {
+          "name": "total_users",
+          "path": "$.metric_values[1].value",
+          "type": "string",
+          "description": "Unique users"
+        },
+        {
+          "name": "events_per_user",
+          "path": "$.metric_values[2].value",
+          "type": "string",
+          "description": "Events per user"
+        }
+      ],
+      "outputExample": {
+        "event_name": "page_view",
+        "event_count": "7510",
+        "total_users": "4959",
+        "events_per_user": "1.68"
+      }
+    },
+    {
+      "id": "ga_daily_trend_report",
+      "name": "Daily Trend Report",
+      "description": "Shows daily traffic trends over time - essential for spotting patterns, anomalies, and growth.",
+      "parentTool": "analytics-mcp__run_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "date"
+        ],
+        "metrics": [
+          "sessions",
+          "totalUsers",
+          "newUsers",
+          "screenPageViews",
+          "engagementRate"
+        ],
+        "order_bys": [
+          {
+            "dimension": {
+              "dimension_name": "date",
+              "order_type": 1
+            },
+            "desc": false
+          }
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get property_id",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "start_date",
+          "type": "string",
+          "required": true,
+          "description": "Start date",
+          "mapToParentArg": "date_ranges[0].start_date"
+        },
+        {
+          "name": "end_date",
+          "type": "string",
+          "required": true,
+          "description": "End date",
+          "mapToParentArg": "date_ranges[0].end_date"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "date",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "Date (YYYYMMDD)"
+        },
+        {
+          "name": "sessions",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Sessions"
+        },
+        {
+          "name": "total_users",
+          "path": "$.metric_values[1].value",
+          "type": "string",
+          "description": "Total users"
+        },
+        {
+          "name": "new_users",
+          "path": "$.metric_values[2].value",
+          "type": "string",
+          "description": "New users"
+        },
+        {
+          "name": "page_views",
+          "path": "$.metric_values[3].value",
+          "type": "string",
+          "description": "Page views"
+        },
+        {
+          "name": "engagement_rate",
+          "path": "$.metric_values[4].value",
+          "type": "string",
+          "description": "Engagement rate"
+        }
+      ],
+      "outputExample": {
+        "date": "20251101",
+        "sessions": "250",
+        "total_users": "220",
+        "new_users": "180",
+        "page_views": "450",
+        "engagement_rate": "0.55"
+      }
+    },
+    {
+      "id": "ga_landing_pages_report",
+      "name": "Landing Pages Report",
+      "description": "Shows which pages users enter your site through - critical for SEO and campaign optimization.",
+      "parentTool": "analytics-mcp__run_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "landingPage"
+        ],
+        "metrics": [
+          "sessions",
+          "totalUsers",
+          "bounceRate",
+          "engagementRate",
+          "averageSessionDuration"
+        ],
+        "order_bys": [
+          {
+            "metric": {
+              "metric_name": "sessions"
+            },
+            "desc": true
+          }
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get property_id",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "start_date",
+          "type": "string",
+          "required": true,
+          "description": "Start date",
+          "mapToParentArg": "date_ranges[0].start_date"
+        },
+        {
+          "name": "end_date",
+          "type": "string",
+          "required": true,
+          "description": "End date",
+          "mapToParentArg": "date_ranges[0].end_date"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false,
+          "description": "Max pages to return",
+          "mapToParentArg": "limit"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "landing_page",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "Entry page URL"
+        },
+        {
+          "name": "sessions",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Sessions"
+        },
+        {
+          "name": "total_users",
+          "path": "$.metric_values[1].value",
+          "type": "string",
+          "description": "Users"
+        },
+        {
+          "name": "bounce_rate",
+          "path": "$.metric_values[2].value",
+          "type": "string",
+          "description": "Bounce rate"
+        },
+        {
+          "name": "engagement_rate",
+          "path": "$.metric_values[3].value",
+          "type": "string",
+          "description": "Engagement rate"
+        },
+        {
+          "name": "avg_session_duration",
+          "path": "$.metric_values[4].value",
+          "type": "string",
+          "description": "Avg duration"
+        }
+      ],
+      "outputExample": {
+        "landing_page": "/",
+        "sessions": "1501",
+        "total_users": "1400",
+        "bounce_rate": "0.48",
+        "engagement_rate": "0.52",
+        "avg_session_duration": "46.0"
+      }
+    },
+    {
+      "id": "ga_channel_performance_report",
+      "name": "Channel Performance Report",
+      "description": "Shows traffic by default channel grouping (Organic Search, Paid Search, Social, Direct, etc.) - high-level marketing performance view.",
+      "parentTool": "analytics-mcp__run_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "sessionDefaultChannelGroup"
+        ],
+        "metrics": [
+          "sessions",
+          "totalUsers",
+          "newUsers",
+          "engagementRate",
+          "conversions"
+        ],
+        "order_bys": [
+          {
+            "metric": {
+              "metric_name": "sessions"
+            },
+            "desc": true
+          }
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get property_id",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "start_date",
+          "type": "string",
+          "required": true,
+          "description": "Start date",
+          "mapToParentArg": "date_ranges[0].start_date"
+        },
+        {
+          "name": "end_date",
+          "type": "string",
+          "required": true,
+          "description": "End date",
+          "mapToParentArg": "date_ranges[0].end_date"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "channel",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "Channel group"
+        },
+        {
+          "name": "sessions",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Sessions"
+        },
+        {
+          "name": "total_users",
+          "path": "$.metric_values[1].value",
+          "type": "string",
+          "description": "Users"
+        },
+        {
+          "name": "new_users",
+          "path": "$.metric_values[2].value",
+          "type": "string",
+          "description": "New users"
+        },
+        {
+          "name": "engagement_rate",
+          "path": "$.metric_values[3].value",
+          "type": "string",
+          "description": "Engagement rate"
+        },
+        {
+          "name": "conversions",
+          "path": "$.metric_values[4].value",
+          "type": "string",
+          "description": "Conversions"
+        }
+      ],
+      "outputExample": {
+        "channel": "Organic Search",
+        "sessions": "527",
+        "total_users": "396",
+        "new_users": "371",
+        "engagement_rate": "0.57",
+        "conversions": "15"
+      }
+    },
+    {
+      "id": "ga_user_acquisition_report",
+      "name": "User Acquisition Report",
+      "description": "Shows how new users first discovered your site - focuses on first-touch attribution.",
+      "parentTool": "analytics-mcp__run_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "firstUserSource",
+          "firstUserMedium"
+        ],
+        "metrics": [
+          "totalUsers",
+          "newUsers",
+          "engagementRate",
+          "averageSessionDuration",
+          "conversions"
+        ],
+        "order_bys": [
+          {
+            "metric": {
+              "metric_name": "newUsers"
+            },
+            "desc": true
+          }
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get property_id",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "start_date",
+          "type": "string",
+          "required": true,
+          "description": "Start date",
+          "mapToParentArg": "date_ranges[0].start_date"
+        },
+        {
+          "name": "end_date",
+          "type": "string",
+          "required": true,
+          "description": "End date",
+          "mapToParentArg": "date_ranges[0].end_date"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false,
+          "description": "Max sources to return",
+          "mapToParentArg": "limit"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "first_source",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "First-touch source"
+        },
+        {
+          "name": "first_medium",
+          "path": "$.dimension_values[1].value",
+          "type": "string",
+          "description": "First-touch medium"
+        },
+        {
+          "name": "total_users",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Total users"
+        },
+        {
+          "name": "new_users",
+          "path": "$.metric_values[1].value",
+          "type": "string",
+          "description": "New users"
+        },
+        {
+          "name": "engagement_rate",
+          "path": "$.metric_values[2].value",
+          "type": "string",
+          "description": "Engagement rate"
+        },
+        {
+          "name": "avg_session_duration",
+          "path": "$.metric_values[3].value",
+          "type": "string",
+          "description": "Avg duration"
+        },
+        {
+          "name": "conversions",
+          "path": "$.metric_values[4].value",
+          "type": "string",
+          "description": "Conversions"
+        }
+      ],
+      "outputExample": {
+        "first_source": "google",
+        "first_medium": "organic",
+        "total_users": "396",
+        "new_users": "371",
+        "engagement_rate": "0.57",
+        "avg_session_duration": "45.0",
+        "conversions": "12"
+      }
+    },
+    {
+      "id": "ga_high_bounce_pages",
+      "name": "High Bounce Rate Pages",
+      "description": "Identifies pages with high bounce rates that need optimization - filters for pages with significant traffic and bounce rate > 70%.",
+      "parentTool": "analytics-mcp__run_report",
+      "parentToolDefaultArgs": {
+        "dimensions": [
+          "pagePath"
+        ],
+        "metrics": [
+          "sessions",
+          "bounceRate",
+          "averageSessionDuration",
+          "engagementRate"
+        ],
+        "metric_filter": {
+          "filter": {
+            "field_name": "bounceRate",
+            "numeric_filter": {
+              "operation": 4,
+              "value": {
+                "double_value": 0.7
+              }
+            }
+          }
+        },
+        "order_bys": [
+          {
+            "metric": {
+              "metric_name": "sessions"
+            },
+            "desc": true
+          }
+        ]
+      },
+      "requiresFirst": [
+        {
+          "subTool": "ga_list_properties",
+          "reason": "To get property_id",
+          "extractField": "property_id",
+          "fromPath": "$.property"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "property_id",
+          "type": "reference",
+          "required": true,
+          "description": "The GA4 property ID",
+          "mapToParentArg": "property_id"
+        },
+        {
+          "name": "start_date",
+          "type": "string",
+          "required": true,
+          "description": "Start date",
+          "mapToParentArg": "date_ranges[0].start_date"
+        },
+        {
+          "name": "end_date",
+          "type": "string",
+          "required": true,
+          "description": "End date",
+          "mapToParentArg": "date_ranges[0].end_date"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false,
+          "description": "Max pages to return",
+          "mapToParentArg": "limit"
+        }
+      ],
+      "jsonPath": "$.result.rows[*]",
+      "outputFields": [
+        {
+          "name": "page_path",
+          "path": "$.dimension_values[0].value",
+          "type": "string",
+          "description": "Page URL"
+        },
+        {
+          "name": "sessions",
+          "path": "$.metric_values[0].value",
+          "type": "string",
+          "description": "Sessions"
+        },
+        {
+          "name": "bounce_rate",
+          "path": "$.metric_values[1].value",
+          "type": "string",
+          "description": "Bounce rate (>0.7)"
+        },
+        {
+          "name": "avg_session_duration",
+          "path": "$.metric_values[2].value",
+          "type": "string",
+          "description": "Avg duration"
+        },
+        {
+          "name": "engagement_rate",
+          "path": "$.metric_values[3].value",
+          "type": "string",
+          "description": "Engagement rate"
+        }
+      ],
+      "outputExample": {
+        "page_path": "/es/cxm-dclm",
+        "sessions": "1568",
+        "bounce_rate": "0.88",
+        "avg_session_duration": "37.4",
+        "engagement_rate": "0.12"
+      }
+    }
+  ],
+  "documentedInputs": [
+    {
+      "toolName": "analytics-mcp__get_account_summaries",
+      "inputName": "(none)",
+      "type": "format",
+      "required": false,
+      "format": "No inputs required",
+      "description": "This tool takes no inputs - it returns all accounts and properties accessible to the authenticated user",
+      "examples": [],
+      "notes": "This is the foundational tool that provides property_id values needed by all other tools"
+    },
+    {
+      "toolName": "analytics-mcp__get_property_details",
+      "inputName": "property_id",
+      "type": "reference",
+      "required": true,
+      "source": {
+        "tool": "analytics-mcp__get_account_summaries",
+        "jsonPath": "$.result[*].property_summaries[*].property",
+        "description": "First call get_account_summaries to get available property IDs"
+      },
+      "format": "properties/{numeric_id} OR just the numeric_id",
+      "example": "properties/281869130 or 281869130"
+    },
+    {
+      "toolName": "analytics-mcp__list_google_ads_links",
+      "inputName": "property_id",
+      "type": "reference",
+      "required": true,
+      "source": {
+        "tool": "analytics-mcp__get_account_summaries",
+        "jsonPath": "$.result[*].property_summaries[*].property",
+        "description": "First call get_account_summaries to get available property IDs"
+      },
+      "format": "properties/{numeric_id} OR just the numeric_id",
+      "example": "properties/281869130 or 281869130"
+    },
+    {
+      "toolName": "analytics-mcp__get_custom_dimensions_and_metrics",
+      "inputName": "property_id",
+      "type": "reference",
+      "required": true,
+      "source": {
+        "tool": "analytics-mcp__get_account_summaries",
+        "jsonPath": "$.result[*].property_summaries[*].property",
+        "description": "First call get_account_summaries to get available property IDs"
+      },
+      "format": "properties/{numeric_id} OR just the numeric_id",
+      "example": "properties/281869130 or 281869130"
+    },
+    {
+      "toolName": "analytics-mcp__run_realtime_report",
+      "inputName": "property_id",
+      "type": "reference",
+      "required": true,
+      "source": {
+        "tool": "analytics-mcp__get_account_summaries",
+        "jsonPath": "$.result[*].property_summaries[*].property",
+        "description": "First call get_account_summaries to get available property IDs"
+      },
+      "format": "properties/{numeric_id} OR just the numeric_id",
+      "example": "properties/281869130 or 281869130"
+    },
+    {
+      "toolName": "analytics-mcp__run_realtime_report",
+      "inputName": "dimensions",
+      "type": "enum",
+      "required": true,
+      "options": [
+        {
+          "value": "audienceId",
+          "description": "Audience ID"
+        },
+        {
+          "value": "audienceName",
+          "description": "Audience name"
+        },
+        {
+          "value": "city",
+          "description": "City name"
+        },
+        {
+          "value": "cityId",
+          "description": "City ID"
+        },
+        {
+          "value": "country",
+          "description": "Country name"
+        },
+        {
+          "value": "countryId",
+          "description": "Country ID"
+        },
+        {
+          "value": "deviceCategory",
+          "description": "Device type: desktop, mobile, tablet"
+        },
+        {
+          "value": "eventName",
+          "description": "Event name (page_view, session_start, etc.)"
+        },
+        {
+          "value": "minutesAgo",
+          "description": "Minutes ago (00-29) - for time-series realtime data"
+        },
+        {
+          "value": "platform",
+          "description": "Platform: web, iOS, Android"
+        },
+        {
+          "value": "streamId",
+          "description": "Data stream ID"
+        },
+        {
+          "value": "streamName",
+          "description": "Data stream name"
+        },
+        {
+          "value": "unifiedScreenClass",
+          "description": "Screen class"
+        },
+        {
+          "value": "unifiedScreenName",
+          "description": "Page title or screen name"
+        }
+      ],
+      "default": null,
+      "notes": "Realtime dimensions are LIMITED - different from regular report dimensions. Some combinations cannot be queried together (e.g., eventName + minutesAgo with activeUsers). User-scoped custom dimensions (customUser:*) from get_custom_dimensions_and_metrics can also be used."
+    },
+    {
+      "toolName": "analytics-mcp__run_realtime_report",
+      "inputName": "metrics",
+      "type": "enum",
+      "required": true,
+      "options": [
+        {
+          "value": "activeUsers",
+          "description": "Number of users currently active on the site/app"
+        },
+        {
+          "value": "conversions",
+          "description": "Total conversions (float type)"
+        },
+        {
+          "value": "eventCount",
+          "description": "Total number of events"
+        },
+        {
+          "value": "screenPageViews",
+          "description": "Total page/screen views"
+        }
+      ],
+      "default": null,
+      "notes": "Realtime metrics are LIMITED. Custom metrics cannot be used in realtime reports. Some metric/dimension combinations are incompatible."
+    },
+    {
+      "toolName": "analytics-mcp__run_realtime_report",
+      "inputName": "dimension_filter",
+      "type": "format",
+      "required": false,
+      "format": "FilterExpression object",
+      "description": "Filter to apply to dimensions. Supports string_filter, in_list_filter, empty_filter with and_group, or_group, not_expression combinations",
+      "examples": [
+        {
+          "filter": {
+            "field_name": "country",
+            "string_filter": {
+              "match_type": 1,
+              "value": "United States",
+              "case_sensitive": false
+            }
+          }
+        },
+        {
+          "filter": {
+            "field_name": "eventName",
+            "in_list_filter": {
+              "values": [
+                "page_view",
+                "session_start"
+              ],
+              "case_sensitive": true
+            }
+          }
+        }
+      ],
+      "notes": "match_type: 1=EXACT, 2=BEGINS_WITH, 3=ENDS_WITH, 4=CONTAINS, 5=FULL_REGEXP, 6=PARTIAL_REGEXP"
+    },
+    {
+      "toolName": "analytics-mcp__run_realtime_report",
+      "inputName": "metric_filter",
+      "type": "format",
+      "required": false,
+      "format": "FilterExpression object with numeric_filter or between_filter",
+      "description": "Filter to apply to metrics",
+      "examples": [
+        {
+          "filter": {
+            "field_name": "activeUsers",
+            "numeric_filter": {
+              "operation": 4,
+              "value": {
+                "int64_value": "5"
+              }
+            }
+          }
+        },
+        {
+          "filter": {
+            "field_name": "eventCount",
+            "between_filter": {
+              "from_value": {
+                "int64_value": "10"
+              },
+              "to_value": {
+                "int64_value": "100"
+              }
+            }
+          }
+        }
+      ],
+      "notes": "operation: 1=EQUAL, 2=LESS_THAN, 3=LESS_THAN_OR_EQUAL, 4=GREATER_THAN, 5=GREATER_THAN_OR_EQUAL"
+    },
+    {
+      "toolName": "analytics-mcp__run_realtime_report",
+      "inputName": "order_bys",
+      "type": "format",
+      "required": false,
+      "format": "Array of OrderBy objects",
+      "description": "How to sort the results",
+      "examples": [
+        [
+          {
+            "metric": {
+              "metric_name": "activeUsers"
+            },
+            "desc": true
+          }
+        ],
+        [
+          {
+            "dimension": {
+              "dimension_name": "country",
+              "order_type": 1
+            },
+            "desc": false
+          }
+        ]
+      ],
+      "notes": "order_type for dimensions: 1=ALPHANUMERIC, 2=CASE_INSENSITIVE_ALPHANUMERIC, 3=NUMERIC. Dimensions/metrics in order_bys must be in the report request."
+    },
+    {
+      "toolName": "analytics-mcp__run_realtime_report",
+      "inputName": "limit",
+      "type": "format",
+      "required": false,
+      "format": "Positive integer <= 250000",
+      "description": "Maximum number of rows to return",
+      "examples": [
+        10,
+        100,
+        1000
+      ],
+      "notes": "Default varies. Use with offset for pagination."
+    },
+    {
+      "toolName": "analytics-mcp__run_realtime_report",
+      "inputName": "offset",
+      "type": "format",
+      "required": false,
+      "format": "Non-negative integer",
+      "description": "Row offset for pagination (first row is 0)",
+      "examples": [
+        0,
+        100,
+        1000
+      ],
+      "notes": "Use with limit for pagination through large result sets."
+    },
+    {
+      "toolName": "analytics-mcp__run_realtime_report",
+      "inputName": "return_property_quota",
+      "type": "enum",
+      "required": false,
+      "options": [
+        {
+          "value": true,
+          "description": "Include quota information in response"
+        },
+        {
+          "value": false,
+          "description": "Don't include quota information"
+        }
+      ],
+      "default": false,
+      "notes": "Useful for monitoring API usage limits"
+    },
+    {
+      "toolName": "analytics-mcp__run_report",
+      "inputName": "property_id",
+      "type": "reference",
+      "required": true,
+      "source": {
+        "tool": "analytics-mcp__get_account_summaries",
+        "jsonPath": "$.result[*].property_summaries[*].property",
+        "description": "First call get_account_summaries to get available property IDs"
+      },
+      "format": "properties/{numeric_id} OR just the numeric_id",
+      "example": "properties/281869130 or 281869130"
+    },
+    {
+      "toolName": "analytics-mcp__run_report",
+      "inputName": "date_ranges",
+      "type": "format",
+      "required": true,
+      "format": "Array of DateRange objects with start_date, end_date, and optional name",
+      "description": "Date ranges for the report. Supports absolute dates (YYYY-MM-DD) and relative dates (today, yesterday, NdaysAgo)",
+      "examples": [
+        [
+          {
+            "start_date": "2025-01-01",
+            "end_date": "2025-01-31",
+            "name": "January"
+          }
+        ],
+        [
+          {
+            "start_date": "30daysAgo",
+            "end_date": "yesterday"
+          }
+        ],
+        [
+          {
+            "start_date": "7daysAgo",
+            "end_date": "today",
+            "name": "current"
+          },
+          {
+            "start_date": "14daysAgo",
+            "end_date": "8daysAgo",
+            "name": "previous"
+          }
+        ]
+      ],
+      "notes": "When using multiple date ranges, a 'dateRange' dimension is automatically added to results. Max 4 date ranges per request."
+    },
+    {
+      "toolName": "analytics-mcp__run_report",
+      "inputName": "dimensions",
+      "type": "enum",
+      "required": true,
+      "options": [
+        {
+          "value": "date",
+          "description": "Date in YYYYMMDD format"
+        },
+        {
+          "value": "dateHour",
+          "description": "Date and hour"
+        },
+        {
+          "value": "dayOfWeek",
+          "description": "Day of week (0=Sunday)"
+        },
+        {
+          "value": "month",
+          "description": "Month"
+        },
+        {
+          "value": "year",
+          "description": "Year"
+        },
+        {
+          "value": "pagePath",
+          "description": "URL path of the page"
+        },
+        {
+          "value": "pageTitle",
+          "description": "Title of the page"
+        },
+        {
+          "value": "landingPage",
+          "description": "First page in session"
+        },
+        {
+          "value": "exitPage",
+          "description": "Last page in session"
+        },
+        {
+          "value": "hostname",
+          "description": "Website hostname"
+        },
+        {
+          "value": "sessionSource",
+          "description": "Traffic source for session"
+        },
+        {
+          "value": "sessionMedium",
+          "description": "Traffic medium for session (organic, cpc, referral, etc.)"
+        },
+        {
+          "value": "sessionCampaignName",
+          "description": "Campaign name"
+        },
+        {
+          "value": "sessionDefaultChannelGroup",
+          "description": "Default channel grouping"
+        },
+        {
+          "value": "firstUserSource",
+          "description": "Source of user's first session"
+        },
+        {
+          "value": "firstUserMedium",
+          "description": "Medium of user's first session"
+        },
+        {
+          "value": "country",
+          "description": "Country name"
+        },
+        {
+          "value": "countryId",
+          "description": "Country ID (ISO 3166-1 alpha-2)"
+        },
+        {
+          "value": "city",
+          "description": "City name"
+        },
+        {
+          "value": "region",
+          "description": "Geographic region"
+        },
+        {
+          "value": "deviceCategory",
+          "description": "Device type: desktop, mobile, tablet"
+        },
+        {
+          "value": "operatingSystem",
+          "description": "OS name"
+        },
+        {
+          "value": "browser",
+          "description": "Browser name"
+        },
+        {
+          "value": "platform",
+          "description": "Platform: web, iOS, Android"
+        },
+        {
+          "value": "language",
+          "description": "User language"
+        },
+        {
+          "value": "eventName",
+          "description": "Event name"
+        },
+        {
+          "value": "isConversionEvent",
+          "description": "Whether event is marked as conversion"
+        },
+        {
+          "value": "audienceId",
+          "description": "Audience ID"
+        },
+        {
+          "value": "audienceName",
+          "description": "Audience name"
+        },
+        {
+          "value": "newVsReturning",
+          "description": "New or returning user"
+        },
+        {
+          "value": "userAgeBracket",
+          "description": "User age bracket"
+        },
+        {
+          "value": "userGender",
+          "description": "User gender"
+        }
+      ],
+      "default": null,
+      "notes": "This is a subset of common dimensions. Full list at https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema#dimensions. Custom dimensions from get_custom_dimensions_and_metrics can also be used."
+    },
+    {
+      "toolName": "analytics-mcp__run_report",
+      "inputName": "metrics",
+      "type": "enum",
+      "required": true,
+      "options": [
+        {
+          "value": "sessions",
+          "description": "Total sessions"
+        },
+        {
+          "value": "totalUsers",
+          "description": "Total unique users"
+        },
+        {
+          "value": "newUsers",
+          "description": "New users"
+        },
+        {
+          "value": "activeUsers",
+          "description": "Active users"
+        },
+        {
+          "value": "screenPageViews",
+          "description": "Total page/screen views"
+        },
+        {
+          "value": "screenPageViewsPerSession",
+          "description": "Pages per session"
+        },
+        {
+          "value": "averageSessionDuration",
+          "description": "Avg session duration in seconds"
+        },
+        {
+          "value": "bounceRate",
+          "description": "Bounce rate (0-1 decimal)"
+        },
+        {
+          "value": "engagementRate",
+          "description": "Engagement rate (0-1 decimal)"
+        },
+        {
+          "value": "engagedSessions",
+          "description": "Sessions with engagement"
+        },
+        {
+          "value": "eventCount",
+          "description": "Total event count"
+        },
+        {
+          "value": "eventCountPerUser",
+          "description": "Events per user"
+        },
+        {
+          "value": "conversions",
+          "description": "Total conversions"
+        },
+        {
+          "value": "totalRevenue",
+          "description": "Total revenue"
+        },
+        {
+          "value": "purchaseRevenue",
+          "description": "Purchase revenue"
+        },
+        {
+          "value": "ecommercePurchases",
+          "description": "Number of purchases"
+        },
+        {
+          "value": "transactions",
+          "description": "Transaction count"
+        },
+        {
+          "value": "itemsViewed",
+          "description": "Product views"
+        },
+        {
+          "value": "itemsAddedToCart",
+          "description": "Add to cart count"
+        },
+        {
+          "value": "itemsPurchased",
+          "description": "Items purchased"
+        },
+        {
+          "value": "userEngagementDuration",
+          "description": "Total engagement time"
+        },
+        {
+          "value": "sessionsPerUser",
+          "description": "Sessions per user"
+        }
+      ],
+      "default": null,
+      "notes": "This is a subset of common metrics. Full list at https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema#metrics. Custom metrics from get_custom_dimensions_and_metrics can also be used."
+    },
+    {
+      "toolName": "analytics-mcp__run_report",
+      "inputName": "dimension_filter",
+      "type": "format",
+      "required": false,
+      "format": "FilterExpression object",
+      "description": "Filter to apply to dimensions before aggregation",
+      "examples": [
+        {
+          "filter": {
+            "field_name": "country",
+            "string_filter": {
+              "match_type": 1,
+              "value": "United States",
+              "case_sensitive": false
+            }
+          }
+        },
+        {
+          "filter": {
+            "field_name": "eventName",
+            "in_list_filter": {
+              "values": [
+                "page_view",
+                "purchase"
+              ],
+              "case_sensitive": true
+            }
+          }
+        },
+        {
+          "filter": {
+            "field_name": "pagePath",
+            "string_filter": {
+              "match_type": 2,
+              "value": "/blog/",
+              "case_sensitive": false
+            }
+          }
+        },
+        {
+          "and_group": {
+            "expressions": [
+              {
+                "filter": {
+                  "field_name": "deviceCategory",
+                  "string_filter": {
+                    "match_type": 1,
+                    "value": "mobile"
+                  }
+                }
+              },
+              {
+                "filter": {
+                  "field_name": "country",
+                  "string_filter": {
+                    "match_type": 1,
+                    "value": "United States"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "not_expression": {
+            "filter": {
+              "field_name": "pagePath",
+              "string_filter": {
+                "match_type": 2,
+                "value": "/admin/"
+              }
+            }
+          }
+        }
+      ],
+      "notes": "match_type: 1=EXACT, 2=BEGINS_WITH, 3=ENDS_WITH, 4=CONTAINS, 5=FULL_REGEXP, 6=PARTIAL_REGEXP"
+    },
+    {
+      "toolName": "analytics-mcp__run_report",
+      "inputName": "metric_filter",
+      "type": "format",
+      "required": false,
+      "format": "FilterExpression object with numeric_filter or between_filter",
+      "description": "Filter to apply to metrics after aggregation",
+      "examples": [
+        {
+          "filter": {
+            "field_name": "sessions",
+            "numeric_filter": {
+              "operation": 4,
+              "value": {
+                "int64_value": "100"
+              }
+            }
+          }
+        },
+        {
+          "filter": {
+            "field_name": "bounceRate",
+            "numeric_filter": {
+              "operation": 4,
+              "value": {
+                "double_value": 0.5
+              }
+            }
+          }
+        },
+        {
+          "filter": {
+            "field_name": "totalRevenue",
+            "between_filter": {
+              "from_value": {
+                "double_value": 100
+              },
+              "to_value": {
+                "double_value": 1000
+              }
+            }
+          }
+        }
+      ],
+      "notes": "operation: 1=EQUAL, 2=LESS_THAN, 3=LESS_THAN_OR_EQUAL, 4=GREATER_THAN, 5=GREATER_THAN_OR_EQUAL. Cannot be combined with dimension_filter in complex AND/OR across both."
+    },
+    {
+      "toolName": "analytics-mcp__run_report",
+      "inputName": "order_bys",
+      "type": "format",
+      "required": false,
+      "format": "Array of OrderBy objects",
+      "description": "Sort order for results",
+      "examples": [
+        [
+          {
+            "metric": {
+              "metric_name": "sessions"
+            },
+            "desc": true
+          }
+        ],
+        [
+          {
+            "dimension": {
+              "dimension_name": "date",
+              "order_type": 1
+            },
+            "desc": false
+          }
+        ],
+        [
+          {
+            "metric": {
+              "metric_name": "sessions"
+            },
+            "desc": true
+          },
+          {
+            "dimension": {
+              "dimension_name": "country",
+              "order_type": 2
+            },
+            "desc": false
+          }
+        ]
+      ],
+      "notes": "order_type for dimensions: 1=ALPHANUMERIC, 2=CASE_INSENSITIVE_ALPHANUMERIC, 3=NUMERIC. Dimensions/metrics must appear in the report request."
+    },
+    {
+      "toolName": "analytics-mcp__run_report",
+      "inputName": "limit",
+      "type": "format",
+      "required": false,
+      "format": "Positive integer <= 250000",
+      "description": "Maximum rows to return",
+      "examples": [
+        10,
+        100,
+        1000,
+        10000
+      ],
+      "notes": "Use with offset for pagination. Default returns all rows up to 250,000."
+    },
+    {
+      "toolName": "analytics-mcp__run_report",
+      "inputName": "offset",
+      "type": "format",
+      "required": false,
+      "format": "Non-negative integer",
+      "description": "Starting row for pagination (0-indexed)",
+      "examples": [
+        0,
+        100,
+        1000
+      ],
+      "notes": "Use with limit for pagination through large result sets."
+    },
+    {
+      "toolName": "analytics-mcp__run_report",
+      "inputName": "currency_code",
+      "type": "format",
+      "required": false,
+      "format": "ISO 4217 currency code",
+      "description": "Currency for revenue metrics",
+      "examples": [
+        "USD",
+        "EUR",
+        "GBP",
+        "JPY"
+      ],
+      "notes": "Defaults to property's currency setting if not specified."
+    },
+    {
+      "toolName": "analytics-mcp__run_report",
+      "inputName": "return_property_quota",
+      "type": "enum",
+      "required": false,
+      "options": [
+        {
+          "value": true,
+          "description": "Include API quota usage in response"
+        },
+        {
+          "value": false,
+          "description": "Don't include quota information"
+        }
+      ],
+      "default": false,
+      "notes": "Useful for monitoring API limits"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "wf_identify_underperforming_content",
+      "userTask": "Which pages on my site are performing poorly and should be improved or removed?",
+      "category": "optimization",
+      "complexity": "multi-step",
+      "steps": [
+        {
+          "step": 1,
+          "subTool": "ga_list_properties",
+          "purpose": "Get the property ID for the website to analyze",
+          "inputSource": "user",
+          "inputMapping": {}
+        },
+        {
+          "step": 2,
+          "subTool": "ga_high_bounce_pages",
+          "purpose": "Find pages with bounce rate > 70% that have significant traffic",
+          "inputSource": "user|step_1",
+          "inputMapping": {
+            "property_id": "user selection from step1",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 20
+          }
+        },
+        {
+          "step": 3,
+          "subTool": "ga_page_performance_report",
+          "purpose": "Get full performance context for all pages",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 50
+          }
+        },
+        {
+          "step": 4,
+          "action": "analyze",
+          "purpose": "Prioritize pages needing improvement based on traffic volume and bounce rate",
+          "logic": "Score each page: (bounce_rate * sessions) = impact_score. Higher score = more urgent fix needed. Pages with bounce > 85% and sessions > 100 are critical."
+        }
+      ],
+      "answerTemplate": "Found {count} underperforming pages. Priority fixes: 1) {page1} - {sessions1} sessions, {bounce1}% bounce rate. 2) {page2} - {sessions2} sessions, {bounce2}% bounce. Recommendation: Review content relevance, page load speed, and mobile experience for these pages.",
+      "decisionPoints": [
+        "If bounce rate > 90% and sessions > 50, recommend content audit or removal",
+        "If bounce rate 70-90% and engagement < 20%, recommend UX improvements",
+        "If page has high traffic but low engagement, check if it matches search intent"
+      ]
+    },
+    {
+      "id": "wf_compare_traffic_periods",
+      "userTask": "How does my traffic this month compare to last month? What changed and why?",
+      "category": "comparison",
+      "complexity": "multi-step",
+      "steps": [
+        {
+          "step": 1,
+          "subTool": "ga_list_properties",
+          "purpose": "Get available properties",
+          "inputSource": "user",
+          "inputMapping": {}
+        },
+        {
+          "step": 2,
+          "subTool": "ga_daily_trend_report",
+          "purpose": "Get daily trends for current period",
+          "inputSource": "user|step_1",
+          "inputMapping": {
+            "property_id": "user selection",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday"
+          }
+        },
+        {
+          "step": 3,
+          "subTool": "ga_daily_trend_report",
+          "purpose": "Get daily trends for previous period",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "60daysAgo",
+            "end_date": "31daysAgo"
+          }
+        },
+        {
+          "step": 4,
+          "subTool": "ga_traffic_sources_report",
+          "purpose": "Get traffic sources for current period to identify what's driving changes",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday"
+          }
+        },
+        {
+          "step": 5,
+          "subTool": "ga_traffic_sources_report",
+          "purpose": "Get traffic sources for previous period for comparison",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "60daysAgo",
+            "end_date": "31daysAgo"
+          }
+        },
+        {
+          "step": 6,
+          "action": "compare",
+          "purpose": "Calculate period-over-period changes and identify biggest movers",
+          "logic": "Sum sessions/users for each period. Calculate % change. Compare source/medium performance between periods to find which channels grew or declined most."
+        }
+      ],
+      "answerTemplate": "Traffic comparison: Current period had {current_sessions} sessions vs {previous_sessions} last period ({change_pct}% change). Biggest changes: {source1} {direction1} by {change1}%, {source2} {direction2} by {change2}%. This suggests {analysis}.",
+      "decisionPoints": [
+        "If organic traffic dropped > 20%, investigate SEO issues or algorithm updates",
+        "If paid traffic dropped but organic grew, evaluate if this is intentional budget shift",
+        "If direct traffic spiked, look for PR mentions or email campaigns",
+        "If referral traffic changed significantly, identify which referring sites"
+      ]
+    },
+    {
+      "id": "wf_best_traffic_source_analysis",
+      "userTask": "Which traffic source is bringing me the best quality visitors? Where should I invest more?",
+      "category": "analysis",
+      "complexity": "multi-step",
+      "steps": [
+        {
+          "step": 1,
+          "subTool": "ga_list_properties",
+          "purpose": "Get available properties",
+          "inputSource": "user",
+          "inputMapping": {}
+        },
+        {
+          "step": 2,
+          "subTool": "ga_traffic_sources_report",
+          "purpose": "Get all traffic sources with engagement metrics",
+          "inputSource": "user|step_1",
+          "inputMapping": {
+            "property_id": "user selection",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 30
+          }
+        },
+        {
+          "step": 3,
+          "subTool": "ga_channel_performance_report",
+          "purpose": "Get channel-level view for strategic planning",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday"
+          }
+        },
+        {
+          "step": 4,
+          "action": "analyze",
+          "purpose": "Rank traffic sources by quality score combining engagement and volume",
+          "logic": "Quality Score = (engagement_rate * 0.4) + (avg_session_duration_normalized * 0.3) + (pages_per_session_normalized * 0.3). Efficiency Score = Quality Score / cost (if paid). Rank sources by quality for organic, by efficiency for paid."
+        }
+      ],
+      "answerTemplate": "Best quality traffic sources: 1) {source1}/{medium1} with {engagement1}% engagement, {duration1}s avg duration. 2) {source2}/{medium2} with {engagement2}% engagement. Recommendation: Increase investment in {best_source} which has {quality_description}. Consider reducing spend on {worst_source} which has only {worst_engagement}% engagement.",
+      "decisionPoints": [
+        "If organic has highest engagement but low volume, invest in SEO content",
+        "If paid has high volume but low engagement, optimize ad targeting or landing pages",
+        "If referral traffic has high engagement, pursue more partnerships with those sites",
+        "If social has low engagement, review content strategy for social channels"
+      ]
+    },
+    {
+      "id": "wf_mobile_vs_desktop_analysis",
+      "userTask": "Is my website performing well on mobile devices? Should I prioritize mobile optimization?",
+      "category": "investigation",
+      "complexity": "multi-step",
+      "steps": [
+        {
+          "step": 1,
+          "subTool": "ga_list_properties",
+          "purpose": "Get available properties",
+          "inputSource": "user",
+          "inputMapping": {}
+        },
+        {
+          "step": 2,
+          "subTool": "ga_device_report",
+          "purpose": "Get performance breakdown by device category",
+          "inputSource": "user|step_1",
+          "inputMapping": {
+            "property_id": "user selection",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday"
+          }
+        },
+        {
+          "step": 3,
+          "subTool": "ga_geographic_report",
+          "purpose": "Check if device issues vary by geography (mobile-first markets)",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 15
+          }
+        },
+        {
+          "step": 4,
+          "action": "analyze",
+          "purpose": "Calculate mobile performance gap and business impact",
+          "logic": "Mobile Gap = desktop_engagement_rate - mobile_engagement_rate. If gap > 15%, significant mobile UX issues. Calculate lost_sessions = mobile_sessions * mobile_gap as opportunity cost."
+        }
+      ],
+      "answerTemplate": "Device breakdown: Desktop {desktop_pct}% of traffic with {desktop_engagement}% engagement. Mobile {mobile_pct}% of traffic with {mobile_engagement}% engagement. Mobile performance gap: {gap}%. {recommendation}",
+      "decisionPoints": [
+        "If mobile traffic > 50% but engagement < desktop by 20%+, urgent mobile optimization needed",
+        "If mobile bounce rate > 70%, check page load speed and mobile UX",
+        "If mobile sessions growing but engagement declining, site may not be keeping up with mobile traffic growth",
+        "If tablet has worst performance, may indicate responsive design breakpoint issues"
+      ]
+    },
+    {
+      "id": "wf_realtime_monitoring",
+      "userTask": "What's happening on my website right now? Is there any unusual activity?",
+      "category": "reporting",
+      "complexity": "multi-step",
+      "steps": [
+        {
+          "step": 1,
+          "subTool": "ga_list_properties",
+          "purpose": "Get available properties",
+          "inputSource": "user",
+          "inputMapping": {}
+        },
+        {
+          "step": 2,
+          "subTool": "ga_realtime_active_users_by_country",
+          "purpose": "See where current visitors are located",
+          "inputSource": "user|step_1",
+          "inputMapping": {
+            "property_id": "user selection",
+            "limit": 10
+          }
+        },
+        {
+          "step": 3,
+          "subTool": "ga_realtime_active_users_by_page",
+          "purpose": "See what pages visitors are viewing now",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "limit": 10
+          }
+        },
+        {
+          "step": 4,
+          "subTool": "ga_realtime_trend_by_minute",
+          "purpose": "Check for traffic spikes or drops in last 30 minutes",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2"
+          }
+        },
+        {
+          "step": 5,
+          "subTool": "ga_realtime_events",
+          "purpose": "See what actions users are taking right now",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "limit": 10
+          }
+        },
+        {
+          "step": 6,
+          "action": "analyze",
+          "purpose": "Identify anomalies or noteworthy patterns",
+          "logic": "Compare current active users to typical levels. Flag if traffic > 2x normal or < 0.5x normal. Check if traffic is concentrated in unusual geography or on unexpected pages."
+        }
+      ],
+      "answerTemplate": "Right now: {active_users} active users. Top locations: {top_countries}. Most viewed pages: {top_pages}. Traffic trend: {trend_description}. Notable: {anomalies_or_insights}.",
+      "decisionPoints": [
+        "If traffic spike from single country, may indicate bot traffic or viral content",
+        "If specific page has unusual traffic, check for social media mentions or news coverage",
+        "If traffic suddenly dropped, check for site outages or tracking issues",
+        "If conversion events spiking, a campaign may be performing exceptionally well"
+      ]
+    },
+    {
+      "id": "wf_landing_page_optimization",
+      "userTask": "Which landing pages should I optimize first to improve conversions?",
+      "category": "optimization",
+      "complexity": "multi-step",
+      "steps": [
+        {
+          "step": 1,
+          "subTool": "ga_list_properties",
+          "purpose": "Get available properties",
+          "inputSource": "user",
+          "inputMapping": {}
+        },
+        {
+          "step": 2,
+          "subTool": "ga_landing_pages_report",
+          "purpose": "Get all landing pages with performance metrics",
+          "inputSource": "user|step_1",
+          "inputMapping": {
+            "property_id": "user selection",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 30
+          }
+        },
+        {
+          "step": 3,
+          "subTool": "ga_traffic_sources_report",
+          "purpose": "Understand which sources drive traffic to prioritize paid vs organic landing pages",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 20
+          }
+        },
+        {
+          "step": 4,
+          "action": "analyze",
+          "purpose": "Calculate optimization priority score for each landing page",
+          "logic": "Priority Score = sessions * (1 - engagement_rate). Higher score = more potential improvement. Filter for pages with sessions > 50 to focus on meaningful volume. Flag pages with paid traffic and bounce > 60% as urgent (wasting ad spend)."
+        }
+      ],
+      "answerTemplate": "Top landing pages to optimize: 1) {page1} - {sessions1} sessions, {bounce1}% bounce (potential: {potential1} recovered sessions). 2) {page2} - {sessions2} sessions, {bounce2}% bounce. Quick wins: {quick_wins}. For paid traffic landing pages, prioritize: {paid_priorities}.",
+      "decisionPoints": [
+        "If landing page bounce > 80%, check page relevance to traffic source",
+        "If organic landing page performs poorly, may indicate content-keyword mismatch",
+        "If paid landing page has high bounce, check ad copy alignment with page content",
+        "If homepage is top landing page with high bounce, consider adding clearer CTAs"
+      ]
+    },
+    {
+      "id": "wf_new_vs_returning_analysis",
+      "userTask": "Am I getting enough new visitors? How well am I retaining existing users?",
+      "category": "analysis",
+      "complexity": "multi-step",
+      "steps": [
+        {
+          "step": 1,
+          "subTool": "ga_list_properties",
+          "purpose": "Get available properties",
+          "inputSource": "user",
+          "inputMapping": {}
+        },
+        {
+          "step": 2,
+          "subTool": "ga_user_acquisition_report",
+          "purpose": "See how new users are being acquired",
+          "inputSource": "user|step_1",
+          "inputMapping": {
+            "property_id": "user selection",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 20
+          }
+        },
+        {
+          "step": 3,
+          "subTool": "ga_daily_trend_report",
+          "purpose": "Track new vs total users over time to see retention trends",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday"
+          }
+        },
+        {
+          "step": 4,
+          "subTool": "ga_channel_performance_report",
+          "purpose": "See which channels bring new users vs returning",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday"
+          }
+        },
+        {
+          "step": 5,
+          "action": "analyze",
+          "purpose": "Calculate acquisition health metrics",
+          "logic": "New User Ratio = new_users / total_users. Healthy range is 40-70% depending on business model. If > 80%, not retaining users. If < 30%, not growing audience. Calculate retention_proxy = (total_users - new_users) / total_users."
+        }
+      ],
+      "answerTemplate": "User acquisition analysis: {new_users} new users ({new_pct}% of total). Returning users: {returning_users} ({returning_pct}%). Top acquisition channels: {top_channels}. Trend: {trend_analysis}. Assessment: {health_assessment}.",
+      "decisionPoints": [
+        "If new user ratio > 85%, focus on engagement and retention strategies",
+        "If new user ratio < 30%, increase top-of-funnel marketing investment",
+        "If returning user engagement is low, review email marketing and remarketing",
+        "If specific channel has high new user % but low engagement, targeting may be too broad"
+      ]
+    },
+    {
+      "id": "wf_geographic_expansion_analysis",
+      "userTask": "Which countries or regions should I focus on for expansion? Where is my untapped potential?",
+      "category": "investigation",
+      "complexity": "multi-step",
+      "steps": [
+        {
+          "step": 1,
+          "subTool": "ga_list_properties",
+          "purpose": "Get available properties",
+          "inputSource": "user",
+          "inputMapping": {}
+        },
+        {
+          "step": 2,
+          "subTool": "ga_geographic_report",
+          "purpose": "Get traffic and engagement by country",
+          "inputSource": "user|step_1",
+          "inputMapping": {
+            "property_id": "user selection",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 30
+          }
+        },
+        {
+          "step": 3,
+          "subTool": "ga_device_report",
+          "purpose": "Understand device preferences to inform localization strategy",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday"
+          }
+        },
+        {
+          "step": 4,
+          "subTool": "ga_get_property_details",
+          "purpose": "Check current property timezone and currency settings",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2"
+          }
+        },
+        {
+          "step": 5,
+          "action": "analyze",
+          "purpose": "Identify high-potential markets for expansion",
+          "logic": "Opportunity Score = engagement_rate * (1 / market_saturation_proxy). Markets with high engagement but lower traffic have growth potential. Flag countries with traffic > 100 sessions and engagement > 50% as high-potential. Consider mobile-first for emerging markets."
+        }
+      ],
+      "answerTemplate": "Geographic analysis: Top markets by volume: {top_volume_countries}. Highest engagement markets: {top_engagement_countries}. Expansion opportunities (high engagement, room to grow): {opportunity_markets}. Recommendation: {expansion_recommendation}.",
+      "decisionPoints": [
+        "If a country has high engagement but low traffic, consider localized content or ads",
+        "If emerging markets show high mobile %, ensure mobile-optimized experience",
+        "If a country has high traffic but low engagement, investigate content relevance",
+        "If engagement varies significantly by country, consider regional landing pages"
+      ]
+    },
+    {
+      "id": "wf_campaign_effectiveness",
+      "userTask": "How effective are my marketing campaigns? Which ones should I scale or stop?",
+      "category": "analysis",
+      "complexity": "multi-step",
+      "steps": [
+        {
+          "step": 1,
+          "subTool": "ga_list_properties",
+          "purpose": "Get available properties",
+          "inputSource": "user",
+          "inputMapping": {}
+        },
+        {
+          "step": 2,
+          "subTool": "ga_list_google_ads_links",
+          "purpose": "Check if Google Ads is linked for paid campaign data",
+          "inputSource": "user|step_1",
+          "inputMapping": {
+            "property_id": "user selection"
+          }
+        },
+        {
+          "step": 3,
+          "subTool": "ga_traffic_sources_report",
+          "purpose": "Get all traffic sources including campaign traffic",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 30
+          }
+        },
+        {
+          "step": 4,
+          "subTool": "ga_channel_performance_report",
+          "purpose": "Get channel-level performance for budget allocation decisions",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday"
+          }
+        },
+        {
+          "step": 5,
+          "action": "analyze",
+          "purpose": "Rank campaigns by effectiveness and ROI potential",
+          "logic": "Effectiveness Score = (engagement_rate * 0.5) + (conversions_per_session * 0.5). Compare paid channels (cpc, paid) vs organic. Flag paid sources with engagement < 20% as potential waste. Identify top performers for scaling."
+        }
+      ],
+      "answerTemplate": "Campaign effectiveness: Paid traffic: {paid_sessions} sessions, {paid_engagement}% engagement, {paid_conversions} conversions. Organic: {organic_sessions} sessions, {organic_engagement}% engagement. Best performing: {best_campaign}. Underperforming: {worst_campaign}. Recommendation: {budget_recommendation}.",
+      "decisionPoints": [
+        "If paid engagement < 20% while organic > 50%, improve ad targeting or landing pages",
+        "If specific source/medium has high conversions, increase budget allocation",
+        "If Google Ads linked but CPC engagement low, review keyword targeting",
+        "If referral traffic has high engagement, pursue partnership opportunities"
+      ]
+    },
+    {
+      "id": "wf_content_performance_audit",
+      "userTask": "Which content is performing best? What topics should I create more of?",
+      "category": "analysis",
+      "complexity": "multi-step",
+      "steps": [
+        {
+          "step": 1,
+          "subTool": "ga_list_properties",
+          "purpose": "Get available properties",
+          "inputSource": "user",
+          "inputMapping": {}
+        },
+        {
+          "step": 2,
+          "subTool": "ga_page_performance_report",
+          "purpose": "Get all pages with engagement metrics",
+          "inputSource": "user|step_1",
+          "inputMapping": {
+            "property_id": "user selection",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 50
+          }
+        },
+        {
+          "step": 3,
+          "subTool": "ga_landing_pages_report",
+          "purpose": "See which content attracts organic entry traffic",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 30
+          }
+        },
+        {
+          "step": 4,
+          "subTool": "ga_events_report",
+          "purpose": "See what actions users take (scrolls, clicks, shares)",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 20
+          }
+        },
+        {
+          "step": 5,
+          "action": "analyze",
+          "purpose": "Identify content patterns and top performers",
+          "logic": "Content Score = (sessions * engagement_rate * avg_time_on_page). Group pages by URL pattern to identify topic clusters. Top scorers indicate successful topics. Low scorers with high traffic indicate missed opportunities."
+        }
+      ],
+      "answerTemplate": "Content audit results: Top performing pages: {top_pages}. Best engagement: {best_engagement_pages}. Content patterns: {patterns}. Topics to create more of: {recommended_topics}. Content to update: {update_candidates}.",
+      "decisionPoints": [
+        "If /blog/ pages outperform others, invest more in content marketing",
+        "If product pages have low engagement, add more compelling content or CTAs",
+        "If specific topic cluster performs well, create more related content",
+        "If old content still gets traffic but low engagement, update and refresh it"
+      ]
+    },
+    {
+      "id": "wf_site_health_check",
+      "userTask": "Give me an overall health check of my website's analytics - what's working and what needs attention?",
+      "category": "reporting",
+      "complexity": "multi-step",
+      "steps": [
+        {
+          "step": 1,
+          "subTool": "ga_list_properties",
+          "purpose": "Get available properties",
+          "inputSource": "user",
+          "inputMapping": {}
+        },
+        {
+          "step": 2,
+          "subTool": "ga_get_property_details",
+          "purpose": "Get property configuration details",
+          "inputSource": "user|step_1",
+          "inputMapping": {
+            "property_id": "user selection"
+          }
+        },
+        {
+          "step": 3,
+          "subTool": "ga_daily_trend_report",
+          "purpose": "Get traffic trends to assess overall trajectory",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday"
+          }
+        },
+        {
+          "step": 4,
+          "subTool": "ga_channel_performance_report",
+          "purpose": "Assess channel mix health",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday"
+          }
+        },
+        {
+          "step": 5,
+          "subTool": "ga_device_report",
+          "purpose": "Check device performance parity",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday"
+          }
+        },
+        {
+          "step": 6,
+          "subTool": "ga_high_bounce_pages",
+          "purpose": "Identify problem pages",
+          "inputSource": "step_1",
+          "inputMapping": {
+            "property_id": "same as step2",
+            "start_date": "30daysAgo",
+            "end_date": "yesterday",
+            "limit": 10
+          }
+        },
+        {
+          "step": 7,
+          "action": "analyze",
+          "purpose": "Generate overall health score and recommendations",
+          "logic": "Health Score components: Traffic Trend (growing/stable/declining), Channel Diversity (not over-reliant on one source), Device Parity (mobile vs desktop gap < 20%), Engagement Health (overall engagement > 40%), Problem Pages (< 20% of traffic to high-bounce pages). Score 0-100."
+        }
+      ],
+      "answerTemplate": "Site Health Report for {property_name}:\n\n📊 Overall Score: {health_score}/100\n\n✅ Working Well:\n{positives}\n\n⚠️ Needs Attention:\n{concerns}\n\n🎯 Top 3 Recommendations:\n1. {rec1}\n2. {rec2}\n3. {rec3}",
+      "decisionPoints": [
+        "If traffic declining > 10% month-over-month, urgent investigation needed",
+        "If single channel > 60% of traffic, diversification recommended",
+        "If mobile engagement < 50% of desktop, mobile optimization critical",
+        "If overall engagement < 30%, review content strategy and UX"
+      ]
+    }
+  ],
+  "insights": "This MCP provides comprehensive access to Google Analytics 4 data through 6 core tools. The foundational tool is get_account_summaries which provides property IDs needed by all other tools. The two main reporting tools are run_report (historical data with 200+ dimensions/metrics) and run_realtime_report (live data with limited ~15 dimensions/metrics). Key discoveries: (1) Realtime reports have a restricted dimension/metric set - many standard dimensions like firstUserSource don't work; (2) Some dimension/metric combinations are incompatible and will error; (3) Multiple date ranges automatically add a dateRange dimension for comparison; (4) The API uses snake_case for field names not camelCase; (5) Filters use numeric codes for operations (1=EQUAL, 4=GREATER_THAN, etc.) and match types (1=EXACT, 2=BEGINS_WITH, etc.). The most valuable sub-tools focus on common analytics questions: traffic sources, page performance, device breakdown, geographic distribution, and landing page analysis. Workflows enable complex multi-step analyses like comparing time periods, identifying underperforming content, mobile optimization decisions, and comprehensive site health checks."
+}
