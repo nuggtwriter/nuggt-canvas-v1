@@ -1046,7 +1046,7 @@ If the user is asking for something new, just output the new components.
         );
       }
       
-      const nodes = parseDSL(aiResponseText);
+    const nodes = parseDSL(aiResponseText);
       const systemMsg = { role: 'system' as const, content: aiResponseText };
       setHistory([...historyWithUser, systemMsg]);
 
@@ -1134,7 +1134,7 @@ If the user is asking for something new, just output the new components.
     } catch (error) {
       console.error('Failed to generate UI', error);
     } finally {
-      setIsLoading(false);
+    setIsLoading(false);
       setLoadingStatus(null);
       setLoadingComplete(true);
       // Don't auto-reset - only reset when user opens the command bar
@@ -1159,7 +1159,7 @@ If the user is asking for something new, just output the new components.
 
   // Dev mode render
   if (devMode) {
-    return (
+  return (
       <div className="flex h-screen bg-slate-900 text-slate-100 font-mono">
         {/* Dev mode toggle */}
         <button
@@ -1343,9 +1343,9 @@ Example:
               <span className="font-semibold text-slate-800">
                 {toolCallingMode ? '🚀 Pilot System' : 'Multi-Agent Debug'}
               </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
+        </div>
+        <div className="flex items-center gap-2">
+           <button 
                 onClick={() => {
                   setDebugLogs([]);
                   setToolCallingEvents([]);
@@ -1370,8 +1370,8 @@ Example:
                 className="text-slate-400 hover:text-slate-600"
               >
                 <X className="w-4 h-4" />
-              </button>
-            </div>
+          </button>
+        </div>
           </div>
           
           {/* Content - Tool-Calling Mode */}
@@ -1736,7 +1736,7 @@ Example:
                         <span className="text-lg">{getActionIcon(log.action)}</span>
                         <span className="font-semibold text-sm">{log.agent}</span>
                         <span className="text-xs opacity-70">Step {log.step}</span>
-                      </div>
+                </div>
                       <span className="text-[10px] opacity-60">
                         {log.timestamp.toLocaleTimeString()}
                       </span>
@@ -1869,10 +1869,10 @@ Example:
                         <span className="text-xs text-slate-500 bg-white px-2 py-1 rounded">{v.dataType}</span>
                       </div>
                     ))}
-                  </div>
-                </div>
-              )}
-              
+              </div>
+            </div>
+          )}
+
               {/* UI Agent Prompts (Component-Specific) */}
               <div className="border border-emerald-200 rounded-xl overflow-hidden">
                 <div className="bg-emerald-50 px-4 py-3 border-b border-emerald-200">
@@ -1939,8 +1939,8 @@ Example:
                       </pre>
                     </details>
                   </div>
-                </div>
-              )}
+                    </div>
+                  )}
             </div>
             
             {/* Modal Footer */}
@@ -2065,8 +2065,8 @@ Example:
               <Sparkles className="w-3.5 h-3.5 text-green-600" />
               <span className="font-medium">Response ready</span>
               <span className="text-green-500 text-[10px]">• Click to view</span>
-            </div>
-          ) : (
+                      </div>
+                    ) : (
             <div className="text-xs text-slate-400 bg-white/90 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-slate-200/60 shadow-sm">
               Press <kbd className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-600 font-mono text-[10px] border border-slate-200">{shortcutKey} + Enter</kbd> to summon AI
             </div>
@@ -2111,7 +2111,7 @@ Example:
                       
                       {/* Thinking history - show all snippets */}
                       {thinkingHistory.length > 0 && (
-                        <div className="space-y-2">
+                      <div className="space-y-2">
                           {thinkingHistory.map((item) => (
                             <div 
                               key={item.id}
@@ -2126,8 +2126,8 @@ Example:
                               {item.detail}
                             </div>
                           ))}
-                        </div>
-                      )}
+                      </div>
+                    )}
                       
                       {/* Streaming response content */}
                       {loadingStatus?.status === 'generating' && loadingStatus?.detail && (
@@ -2158,7 +2158,7 @@ Example:
                             Hide
                           </Button>
                         </div>
-                      </div>
+                  </div>
 
                       <div className="space-y-4">
                         {/* Pilot System Conversation - show full flow */}
@@ -2172,7 +2172,7 @@ Example:
                                   return (
                                     <div key={idx} className="text-indigo-400">
                                       <span className="text-indigo-500">🚀</span> Pilot System Started
-                                    </div>
+                    </div>
                                   );
                                 }
                                 // Pilot turn
@@ -2260,8 +2260,8 @@ Example:
                                       <pre className="text-blue-300 whitespace-pre-wrap text-xs">{event.report}</pre>
                                       {event.newVariables?.length > 0 && (
                                         <div className="text-blue-400 text-xs mt-1">New: {event.newVariables.join(', ')}</div>
-                                      )}
-                                    </div>
+                  )}
+                </div>
                                   );
                                 }
                                 // Pilot replying to user
@@ -2364,7 +2364,7 @@ Example:
                         {preview?.markdownNodes.length ? (
                           <div>
                             <NuggtRenderer nodes={preview.markdownNodes} />
-                  </div>
+                    </div>
                         ) : null}
                         
                         {/* Interactive content (Input + Action) - for user questions */}
@@ -2372,9 +2372,9 @@ Example:
                           <div className="bg-slate-50/80 rounded-xl p-5 border border-slate-200/50">
                             <div className="text-sm uppercase tracking-[0.15em] text-slate-400 mb-4 font-medium">Your Input</div>
                             <NuggtRenderer nodes={preview.interactiveNodes} />
-                          </div>
-                        ) : null}
                     </div>
+                        ) : null}
+                 </div>
                     </>
                   )}
                 </div>
@@ -2407,10 +2407,10 @@ Example:
                             {selectedModel === model.id && <span className="text-indigo-500">✓</span>}
                           </button>
                         ))}
-                      </div>
-                    )}
-                  </div>
-                  
+            </div>
+          )}
+        </div>
+
                   {/* Tool-Calling Mode Toggle (only for OpenRouter) */}
                   {selectedModel === 'gpt-oss-20b' && (
                     <button
@@ -2434,25 +2434,25 @@ Example:
                         </div>
                       )}
                     
-                    <textarea
-                      ref={inputRef}
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      onKeyDown={handleKeyDown}
+              <textarea
+                ref={inputRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
                       placeholder={selectedIds.size > 0 ? `Describe changes for ${selectedIds.size} selected component(s)...` : "Describe what you want to build..."}
                       className="w-full max-h-48 min-h-[60px] py-3 pl-5 pr-14 resize-none outline-none text-slate-800 placeholder:text-slate-400 bg-transparent text-base leading-relaxed"
-                      disabled={isLoading}
-                    />
+                disabled={isLoading}
+              />
                     <div className="absolute right-3 bottom-3">
                       <Button
-                        onClick={handleSend}
-                        disabled={!inputValue.trim() || isLoading}
+                  onClick={handleSend}
+                  disabled={!inputValue.trim() || isLoading}
                         className="rounded-xl p-2.5 h-10 w-10 flex items-center justify-center"
-                      >
-                        <Send className="w-4 h-4" />
+                >
+                  <Send className="w-4 h-4" />
                       </Button>
-                    </div>
-                  </div>
+              </div>
+            </div>
                     </div>
                  </div>
             ) : (
@@ -2475,7 +2475,7 @@ Example:
                   >
                     <span className="font-medium">{AI_MODELS.find(m => m.id === selectedModel)?.name}</span>
                     <ChevronDown className={`w-4 h-4 transition-transform ${modelDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
+                </button>
                   {modelDropdownOpen && (
                     <div className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 min-w-[200px]">
                       {AI_MODELS.map(model => (
@@ -2491,7 +2491,7 @@ Example:
                         >
                           <span>{model.name}</span>
                           {selectedModel === model.id && <span className="text-indigo-500">✓</span>}
-                        </button>
+                </button>
                       ))}
                     </div>
                   )}
@@ -2508,7 +2508,7 @@ Example:
                     }`}
                   >
                     {toolCallingMode ? '🚀 Pilot System ON' : '🚀 Enable Pilot System'}
-                  </button>
+                </button>
                 )}
                 
                 <div className="w-full relative shadow-2xl rounded-[18px] overflow-hidden bg-white ring-1 ring-slate-200 focus-within:ring-indigo-200 transition-all">
@@ -2518,8 +2518,8 @@ Example:
                       <div className="flex items-center gap-2 text-xs text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg mx-4 mt-3">
                         <span className="font-medium">{selectedIds.size} selected:</span>
                         <span className="text-indigo-500">{getSelectedLabels().slice(0, 2).join(', ')}{selectedIds.size > 2 ? '...' : ''}</span>
-                      </div>
-                    )}
+              </div>
+            )}
                   
               <textarea
                 ref={inputRef}
@@ -2538,8 +2538,8 @@ Example:
                 >
                   <Send className="w-4 h-4" />
                     </Button>
-              </div>
-            </div>
+          </div>
+        </div>
             
                 {/* Quick prompts - only show before conversation starts */}
                 {history.length === 0 && (
@@ -2553,7 +2553,7 @@ Example:
                         {prompt}
                       </button>
                     ))}
-                  </div>
+      </div>
                 )}
 
                 {/* Hint to close */}

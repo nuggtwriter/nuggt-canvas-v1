@@ -4008,6 +4008,66 @@ interface PilotVariable {
 // Type alias for backward compatibility with helper functions
 type ToolCallVariable = PilotVariable;
 
+// Helper function to retry LLM calls that fail or return invalid output
+// Retries if: output contains '<|start|>' or output is empty
+// Max 5 retries with 5 second intervals, counter resets on success
+async function retryLLMCall<T>(
+  generateFn: () => Promise<T>,
+  getOutput: (result: T) => string,
+  context: string
+): Promise<T> {
+  const MAX_RETRIES = 5;
+  const RETRY_DELAY_MS = 5000;
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const result = await generateFn();
+      const output = getOutput(result);
+      
+      // Check for invalid markers
+      if (output.includes('<|start|>')) {
+        console.log(`\n⚠️ [${context}] Attempt ${attempt}/${MAX_RETRIES}: Output contains '<|start|>' - retrying...`);
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+          continue;
+        }
+        throw new Error(`Failed after ${MAX_RETRIES} attempts: output contains '<|start|>'`);
+      }
+      
+      // Check for empty output
+      if (!output || output.trim() === '') {
+        console.log(`\n⚠️ [${context}] Attempt ${attempt}/${MAX_RETRIES}: Empty output - retrying...`);
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+          continue;
+        }
+        throw new Error(`Failed after ${MAX_RETRIES} attempts: empty output`);
+      }
+      
+      // Success!
+      if (attempt > 1) {
+        console.log(`\n✅ [${context}] Succeeded on attempt ${attempt}`);
+      }
+      return result;
+      
+    } catch (error: any) {
+      // If it's our own retry error, propagate it
+      if (error.message?.includes('Failed after')) {
+        throw error;
+      }
+      // Otherwise it's an API error
+      console.log(`\n⚠️ [${context}] Attempt ${attempt}/${MAX_RETRIES}: API error - ${error.message}`);
+      if (attempt < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+        continue;
+      }
+      throw error;
+    }
+  }
+  
+  throw new Error(`Failed after ${MAX_RETRIES} attempts`);
+}
+
 interface PilotState {
   variables: Map<string, PilotVariable>;
   pilotHistory: Array<{ role: string; content: string }>;
@@ -4025,19 +4085,23 @@ function buildToolSummariesForPilot(): string {
   // Add built-in tools first
   result += `## BUILT-IN TOOLS (always available)\n\n`;
   
-  result += `• llm: Ask questions about data values. Use to find specific items or analyze patterns.\n`;
-  result += `  Returns: Natural language answer\n\n`;
+  result += `• llm: Analyze data and create a report. Stores report in a variable.\n`;
+  result += `  Returns: "Stored in '<variable>'" + SUMMARY of key findings (shown to you)\n\n`;
+  
+  result += `• display_report: Display an analysis report to the user.\n`;
+  result += `  Takes the report variable from llm and shows tables, charts, cards on canvas.\n`;
+  result += `  Returns: "Report displayed on canvas"\n\n`;
   
   result += `• extractor: Extract specific values from data using natural language. Stores result in a variable.\n`;
   result += `  Returns: "Stored in variable" or "NOT_FOUND" (you don't see the actual value)\n\n`;
   
-  result += `• table: Display data as a table with columns.\n`;
+  result += `• table: Display data as a table with columns (use display_report instead for analysis results).\n`;
   result += `  Returns: Confirmation that table was displayed\n\n`;
   
-  result += `• line-chart: Display data as a line chart.\n`;
+  result += `• line-chart: Display data as a line chart (use display_report instead for analysis results).\n`;
   result += `  Returns: Confirmation that chart was displayed\n\n`;
   
-  result += `• card: Display markdown content in a card.\n`;
+  result += `• card: Display markdown content in a card (use display_report instead for analysis results).\n`;
   result += `  Returns: Confirmation that card was displayed\n\n`;
   
   if (subTools.length > 0) {
@@ -4166,7 +4230,11 @@ Step 2: EXECUTOR: Use extractor to find the property ID for "vibefam" from the p
         (wait for result)
 Step 3: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for November 2025.
         (wait for result)
-Step 4: EXECUTOR: Create a line chart showing sessions over time from the daily trend.
+Step 4: EXECUTOR: Analyze the daily trend data using llm and store in traffic_analysis.
+        (wait - you receive: "Stored in 'traffic_analysis'. Summary: <key findings>")
+Step 5: EXECUTOR: Display the traffic_analysis report to the user.
+        (wait - report is displayed on canvas)
+Step 6: REPLY: Explain what was displayed based on the summary you received.
 
 WRONG - too many steps at once:
 ❌ EXECUTOR: Get properties, find vibefam's ID, then get daily traffic and display it.
@@ -4238,25 +4306,32 @@ ${toolSummaries}
 • llm - DATA ANALYSIS AGENT: Analyzes DATA stored in VARIABLES
   - ONLY use when you have data variables to analyze
   - It performs: sum, average, max, min, count, compare, percentages, filter, sort
-  - It creates charts, tables, and cards on the Canvas
-  - You receive a SUMMARY of findings
+  - It creates a REPORT (stored in a variable) and a SUMMARY (shown to you)
+  - The REPORT contains instructions for what to display
 
   ⚠️ SCOPE: ONLY for analyzing fetched data in variables
-  ✅ CORRECT: "Analyze [data_variable] and compare the trends"
+  ✅ CORRECT: "Analyze the daily traffic data and store in traffic_analysis"
   ❌ WRONG: General questions, date calculations, or anything without data variables
 
 • extractor - Extract specific values from data into a variable
   - Use for finding specific items (like an ID from a list)
   - You DON'T see the value, just confirmation it's stored
 
-### Display Tools (manual, if needed)
+• display_report - Display an analysis report to the user
+  - Takes a report variable (created by llm) and shows it on canvas
+  - Generates tables, charts, and cards based on the report
+  - Example: "Display the traffic_analysis report to the user"
+
+### Manual Display Tools (only if needed separately)
 • table - Display data as a table
 • line-chart - Display data as a line chart  
 • card - Display markdown content
 • alert - Display an important notice
 
-NOTE: The llm tool now automatically creates visualizations. You only need these 
-display tools if you want to create something specific that the analysis didn't produce.
+⚠️ IMPORTANT WORKFLOW:
+1. Call llm to analyze the data → report stored in variable, you see SUMMARY
+2. Tell Executor to display the report → "Display the <variable> to the user"
+3. REPLY to user explaining what's displayed (based on the SUMMARY you received)
 
 ================================================================================
 ## ⚠️ STEP-BY-STEP EXECUTION RULES
@@ -4272,11 +4347,11 @@ display tools if you want to create something specific that the analysis didn't 
 
 TYPICAL FLOW:
 1. Fetch data (ga_list_properties, etc.)
-2. Extract specific value (extractor)
-3. Use extracted value in next tool
-4. Display results (table, chart)
-5. Analyze if needed (llm)
-6. Reply to user
+2. Extract specific value if needed (extractor)
+3. Use extracted value in next tool (e.g., get report with property_id)
+4. Analyze the data (llm) → report stored, you see SUMMARY
+5. Display the report → "Display the <report_variable> to the user"
+6. Reply to user explaining what's displayed (use the SUMMARY)
 
 ================================================================================
 ## GUIDELINES
@@ -4324,8 +4399,9 @@ function extractMentionedTools(instruction: string): string[] {
   }
   
   // Also check for built-in tools
-  if (instructionLower.includes('llm')) mentioned.push('llm');
+  if (instructionLower.includes('llm') || instructionLower.includes('analyz')) mentioned.push('llm');
   if (instructionLower.includes('extractor') || instructionLower.includes('extract')) mentioned.push('extractor');
+  if (instructionLower.includes('display_report') || instructionLower.includes('display') && instructionLower.includes('report')) mentioned.push('display_report');
   if (instructionLower.includes('table')) mentioned.push('table');
   if (instructionLower.includes('line-chart') || instructionLower.includes('chart')) mentioned.push('line-chart');
   if (instructionLower.includes('card')) mentioned.push('card');
@@ -4401,25 +4477,26 @@ function buildToolDocsForExecutor(toolIds: string[]): string {
     // Built-in tools
     if (toolId === 'llm') {
       result += `### llm (Data Analysis Agent)
-Powerful analysis tool that performs calculations and creates visualizations automatically.
+Analyzes data and stores a report in a variable. Use display_report to show it.
 
-Syntax: \`llm(data: [var1, var2], question: "analysis request in natural language")\`
+Syntax: \`variable_name: llm(data: [var1, var2], question: "analysis request")\`
 
-What it can do:
-- Aggregations: sum, average, max, min, count
+What it does:
+- Performs calculations: sum, average, max, min, count
 - Comparisons: difference, ratio, percentage, percentage change
 - Transformations: filter, sort
-- Arithmetic on columns: add, subtract, multiply, divide
-- Create tables and charts automatically
+- Stores a REPORT (display instructions) and SUMMARY in the variable
 
-Returns: Summary of findings + visualizations on Canvas
+Returns: "Stored in 'variable_name'" (the Pilot also receives the SUMMARY)
 
-Example: \`llm(data: [march_sales, april_sales], question: "Compare March and April revenue, show the trend and highlight key differences")\`
+WORKFLOW:
+1. Call llm to analyze data: \`traffic_report: llm(data: [daily_traffic], question: "...")\`
+2. Display the report: \`display_report(traffic_report)\`
 
-The agent will:
-1. Calculate relevant metrics
-2. Create appropriate charts/tables
-3. Return a summary of key findings
+Example:
+\`\`\`
+traffic_analysis: llm(data: [october_traffic, november_traffic], question: "Compare October and November traffic trends")
+\`\`\`
 
 `;
     }
@@ -4449,32 +4526,53 @@ Bad examples (don't use code syntax):
     
     if (toolId === 'table') {
       result += `### table
-Display data as a table with columns.
+Display data as a table on the Canvas. Users can see this table.
 
-Syntax: \`table({column_name: "Label", data: var[field]}, ...)\`
+Syntax: \`table({column_name: "Label", data: var[field]}, {column_name: "Label2", data: var[field2]}, ...)\`
 Returns: Confirmation that table was displayed
 
-Example: \`table({column_name: "Date", data: report[date]}, {column_name: "Value", data: report[value]})\`
+You can use:
+- Original data variables: daily_traffic[date], daily_traffic[sessions]
+- Analysis variables (from llm): nov_sessions, comparison_data
+
+Example with original data:
+\`table({column_name: "Date", data: daily_traffic[date]}, {column_name: "Sessions", data: daily_traffic[sessions]})\`
+
+Example with analysis variable:
+\`table({column_name: "Month", data: comparison_table[month]}, {column_name: "Total", data: comparison_table[total]})\`
 
 `;
     }
     
     if (toolId === 'line-chart') {
       result += `### line-chart
-Display data as a line chart.
+Display data as a line chart on the Canvas. Great for showing trends over time.
 
 Syntax: \`line-chart(x_data: var[x_field], y_data: var[y_field], x_label: "X Axis", y_label: "Y Axis", colour: "#3b82f6")\`
 Returns: Confirmation that chart was displayed
+
+You can use:
+- Original data variables: daily_traffic[date], daily_traffic[sessions]
+- Analysis variables (from llm): sorted_sessions, filtered_data
+
+Example:
+\`line-chart(x_data: daily_traffic[date], y_data: daily_traffic[sessions], x_label: "Date", y_label: "Sessions")\`
 
 `;
     }
     
     if (toolId === 'card') {
       result += `### card
-Display markdown content in a card.
+Display markdown content in a card on the Canvas. Use for summaries and insights.
 
 Syntax: \`card("## Title\\n\\nYour markdown content here")\`
 Returns: Confirmation that card was displayed
+
+Use this to display analysis findings, summaries, and insights.
+The markdown supports: headings, bold, italic, lists, but NOT tables.
+
+Example:
+\`card("## Traffic Summary\\n\\n**Total sessions:** 14,906\\n**Average daily:** 481\\n\\n### Key Insights\\n- Traffic peaked mid-month\\n- Engagement rate was 45%")\`
 
 `;
     }
@@ -4485,6 +4583,24 @@ Display an important notice or warning.
 
 Syntax: \`alert("Important message here")\`
 Returns: Confirmation that alert was displayed
+
+`;
+    }
+    
+    if (toolId === 'display_report') {
+      result += `### display_report
+Display an analysis report on the canvas. Takes a report variable created by the llm tool.
+
+Syntax: \`display_report(report_variable_name)\`
+
+Example: \`display_report(traffic_analysis)\`
+
+This tool:
+1. Reads the full report from the variable
+2. Generates tables, charts, and cards based on the report instructions
+3. Displays everything on the canvas
+
+Returns: Confirmation that report was displayed on canvas
 
 `;
     }
@@ -4942,12 +5058,14 @@ function parseToolCalls(response: string): Array<{
 }
 
 // Resolve variable references like "variable[key]" to actual data
+// Checks both pilot variables AND analysis variables (from llm tool)
 function resolveVariableRef(
   ref: string, 
   variables: Map<string, ToolCallVariable>
 ): any {
   console.log(`[resolveVariableRef] Resolving: "${ref}"`);
-  console.log(`[resolveVariableRef] Available variables: ${Array.from(variables.keys()).join(', ')}`);
+  console.log(`[resolveVariableRef] Pilot variables: ${Array.from(variables.keys()).join(', ')}`);
+  console.log(`[resolveVariableRef] Analysis variables: ${Array.from(analysisVariables.keys()).join(', ')}`);
   
   // Check if it's a variable reference: varName[key]
   const refMatch = ref.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\[([a-zA-Z_][a-zA-Z0-9_]*)\]$/);
@@ -4955,13 +5073,34 @@ function resolveVariableRef(
     const [, varName, key] = refMatch;
     console.log(`[resolveVariableRef] Parsed: varName="${varName}", key="${key}"`);
     
+    // First check analysis variables (created by llm tool)
+    const analysisVar = analysisVariables.get(varName);
+    if (analysisVar) {
+      console.log(`[resolveVariableRef] Found in analysis variables, type: ${analysisVar.type}`);
+      
+      if (analysisVar.type === 'column') {
+        // Column variable - return the data directly
+        console.log(`[resolveVariableRef] Returning column data: ${JSON.stringify(analysisVar.data)?.slice(0, 300)}`);
+        return analysisVar.data;
+      } else if (analysisVar.type === 'table') {
+        // Table variable - extract the specified column
+        const result = analysisVar.data.map((row: any) => row[key]);
+        console.log(`[resolveVariableRef] Extracted column "${key}" from table: ${JSON.stringify(result)?.slice(0, 300)}`);
+        return result;
+      } else if (analysisVar.type === 'number') {
+        console.log(`[resolveVariableRef] Returning number: ${analysisVar.data}`);
+        return analysisVar.data;
+      }
+    }
+    
+    // Then check pilot variables
     const variable = variables.get(varName);
     if (!variable) {
-      console.log(`[resolveVariableRef] Variable "${varName}" not found!`);
+      console.log(`[resolveVariableRef] Variable "${varName}" not found in either map!`);
       return ref;
     }
     
-    console.log(`[resolveVariableRef] Variable found. Has actualData: ${!!variable.actualData}`);
+    console.log(`[resolveVariableRef] Found in pilot variables. Has actualData: ${!!variable.actualData}`);
     console.log(`[resolveVariableRef] actualData type: ${typeof variable.actualData}`);
     console.log(`[resolveVariableRef] actualData is array: ${Array.isArray(variable.actualData)}`);
     if (variable.actualData) {
@@ -4995,6 +5134,12 @@ function resolveVariableRef(
       return undefined;
     }
   } else {
+    // Just variable name, no field - check if it's an analysis variable
+    const analysisVar = analysisVariables.get(ref);
+    if (analysisVar) {
+      console.log(`[resolveVariableRef] Found analysis variable "${ref}", type: ${analysisVar.type}`);
+      return analysisVar.data;
+    }
     console.log(`[resolveVariableRef] Not a variable reference pattern`);
   }
   return ref; // Return as-is if not a variable reference
@@ -5555,12 +5700,16 @@ IMPORTANT:
 Your response (just the value):`;
 
   try {
-    const response = await client.chat.completions.create({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
-      max_tokens: 500
-    });
+    // Use retry wrapper for Extractor Tool
+    const response = await retryLLMCall(
+      () => client.chat.completions.create({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0
+      }),
+      (res) => res.choices[0]?.message?.content || '',
+      'Extractor Tool'
+    );
     
     const rawText = response.choices[0]?.message?.content?.trim() || 'NOT_FOUND';
     
@@ -6542,9 +6691,6 @@ variable: divide(data[column], 2)         # Divide each by number
 variable: add(data1[col1], data2[col2])        # Add columns
 variable: subtract(data1[col1], data2[col2])   # Subtract columns
 
-### Table Creation (for display)
-variable: table(Label1: data[col1], Label2: data[col2], Label3: stored_var)
-
 ================================================================================
 ## VARIABLE NAMING
 ================================================================================
@@ -6558,6 +6704,7 @@ Use DESCRIPTIVE and UNIQUE names:
 ================================================================================
 
 Write operations one per line. Add # comment explaining what it computes/stores.
+Focus on computing values - tables/charts will be created separately by another agent.
 
 EXAMPLE (for inventory analysis):
 \`\`\`
@@ -6565,7 +6712,7 @@ warehouse_a_total: sum(inventory_a[quantity])  # Total items in warehouse A
 warehouse_b_total: sum(inventory_b[quantity])  # Total items in warehouse B
 inventory_difference: difference(warehouse_a_total, warehouse_b_total)  # Difference between warehouses
 low_stock_items: filter(inventory_a[quantity], "< 50")  # Items with low stock
-comparison_table: table(Warehouse: ["A", "B"], Total Items: [warehouse_a_total, warehouse_b_total])  # Summary table
+pct_more: percentage(warehouse_a_total, warehouse_b_total)  # Percent difference
 \`\`\`
 
 ================================================================================
@@ -6693,8 +6840,8 @@ async function executeExecutionPlan(
 
 // Build context string from execution results for Report Writer
 function buildExecutionResultsContext(results: ExecutionResult[]): string {
-  let computed = '## COMPUTED VALUES (use these in your report)\n\n';
-  let variables = '## AVAILABLE VARIABLES FOR VISUALS\n\n';
+  let computed = '## COMPUTED VALUES (actual numbers - use these in your report)\n\n';
+  let columns = '## AVAILABLE COLUMN VARIABLES (for visualization)\n\n';
   
   for (const r of results) {
     if (r.error) {
@@ -6702,145 +6849,161 @@ function buildExecutionResultsContext(results: ExecutionResult[]): string {
     } else if (r.resultType === 'number') {
       computed += `• ${r.varName} = ${r.value}  (${r.comment || 'computed value'})\n`;
     } else if (r.resultType === 'column') {
-      variables += `• ${r.varName} (column: ${r.count} values) - ${r.comment || 'computed column'}\n`;
-    } else if (r.resultType === 'table') {
-      variables += `• ${r.varName} (table: ${r.count} rows, columns: ${r.columns?.join(', ')}) - ${r.comment || 'created table'}\n`;
+      columns += `• ${r.varName} (column: ${r.count} values) - ${r.comment || 'computed column'}\n`;
     }
+    // Note: No table type - tables are not created by operations
   }
   
-  return computed + '\n' + variables;
+  return computed + '\n' + columns;
 }
 
-// Build the Report Writer prompt
+// Build the Report Writer prompt - creates a display report with natural language instructions
 function buildReportWriterPrompt(
   tablePreviews: string,
   pilotRequest: string,
   executionResults: string
 ): string {
-  return `# REPORT WRITER
+  return `# ANALYSIS REPORT WRITER
 
-You create visualizations and summaries based on computed data.
-You see the original data schemas, the request, and all computed values.
+You write a complete analysis report that will be displayed to the user.
+Your report describes EXACTLY what to show, using available variables.
 
 ================================================================================
-## ORIGINAL DATA (schemas and samples)
+## DATA VARIABLES (passed to analysis)
 ================================================================================
 
 ${tablePreviews}
 
 ================================================================================
-## REQUEST FROM PILOT
+## REQUEST
 ================================================================================
 
 ${pilotRequest}
 
 ================================================================================
-## EXECUTION RESULTS
+## COMPUTED RESULTS
 ================================================================================
 
 ${executionResults}
 
 ================================================================================
-## YOUR TASK
+## AVAILABLE DISPLAY COMPONENTS
 ================================================================================
 
-Create a [report] with visualizations and a [summary] for the Pilot agent.
+You can use these components in your report:
 
-### Visual Types
-
-VISUAL_1: table
-  caption: "Table Caption"
-  data: variable_name   # Reference a table variable
-
-VISUAL_2: line-chart
-  title: "Chart Title"
-  x_data: data[column]
-  y_data: data[column] OR computed_column_variable
-  x_label: "X Axis"
-  y_label: "Y Axis"
-  color: #3b82f6
-
-VISUAL_3: card
-  content: |
-    ## Heading
-    Text with **bold** and *italic*.
-    Reference computed values: The total was **45,000**.
-    - Bullet points
-    - More points
-
-### Rules
-1. Reference variables in VISUAL blocks - don't invent data
-2. Cards: simple markdown only - NO tables in cards
-3. Use the computed VALUES in your card text (e.g., "Revenue was **$52,000**")
-4. Summary is for the Pilot - be concise about key findings
+1. TABLE - Display data in rows and columns
+   Usage: "Display <variable_name> as a table with columns: <col1>, <col2>, ..."
+   
+2. LINE-CHART - Show trends over time or comparisons
+   Usage: "Create a line chart using <variable_name> with <x_column> on X axis and <y_column> on Y axis"
+   
+3. CARD - Display text with markdown formatting
+   Usage: "Create a card with the following content: <markdown text>"
+   Cards support: headings (##), bold (**), italic (*), bullet points (-)
 
 ================================================================================
-## EXAMPLE OUTPUT
+## OUTPUT FORMAT
 ================================================================================
 
-For an inventory comparison request with computed values:
-- warehouse_a_total = 1500
-- warehouse_b_total = 1200
-- inventory_difference = 300
-- comparison_table (table with 2 rows)
+Write your output in exactly this format:
+
+REPORT:
+<Your complete report describing what to display>
+
+Describe each visualization in natural language:
+- Which variable to use
+- What type of display (table, line-chart, card)
+- For tables: which columns to show
+- For charts: what goes on X and Y axes
+- For cards: the exact markdown content to display
+
+Include cards with analysis insights - use the actual computed numbers!
+
+SUMMARY:
+<A concise 1-3 sentence summary of key findings>
+
+================================================================================
+## EXAMPLE
+================================================================================
+
+Given:
+- oct_daily_traffic (variable with date, sessions columns)
+- oct_total = 15234
+- nov_total = 12890
+- traffic_change = -15.4
+- high_traffic_days (column: 8 values)
 
 \`\`\`
-[report]
-VISUAL_1: table
-  caption: "Warehouse Inventory Comparison"
-  data: comparison_table
+REPORT:
+First, display oct_daily_traffic as a table with columns: date, sessions.
 
-VISUAL_2: card
-  content: |
-    ## Inventory Summary
-    Warehouse A holds **1,500** items while Warehouse B has **1,200** items.
-    The difference of **300 items** shows A has 25% more inventory.
-    
-    Consider redistributing stock for balance.
-[/report]
+Then create a line chart using oct_daily_traffic with date on X axis and sessions on Y axis.
 
-[summary]
-Warehouse A (1,500 items) has 300 more items than Warehouse B (1,200 items). Comparison table and summary card displayed showing the 25% difference.
-[/summary]
+Create a card with the following content:
+## October Traffic Analysis
+**Total Sessions:** 15,234
+**Daily Average:** 491 sessions
+
+### Key Findings
+- Traffic peaked mid-month
+- 8 days exceeded 500 sessions
+- Overall healthy engagement
+
+Finally, create a card with the following content:
+## Month-over-Month Comparison
+October: **15,234** sessions
+November: **12,890** sessions
+Change: **-15.4%** decrease
+
+The decline suggests seasonal patterns or campaign timing effects.
+
+SUMMARY:
+October had 15,234 total sessions, down 15.4% from November's 12,890. Traffic peaked mid-month with 8 high-traffic days.
 \`\`\`
 
 ================================================================================
+## RULES
 
-Write your [report] and [summary] now:`;
+1. Use ONLY variables listed above - do not invent data
+2. For numbers, use the EXACT computed values shown
+3. For columns, reference by variable name (you cannot see the values)
+4. Cards should have meaningful analysis, not just raw numbers
+5. SUMMARY must be concise - this is what the Pilot sees
+
+================================================================================
+
+Write your REPORT and SUMMARY now:`;
 }
 
-// Parse Report Writer output
+// Parse Report Writer output (format: REPORT + SUMMARY)
 function parseReportWriterOutput(output: string): { report: string; summary: string } {
   let report = '';
   let summary = '';
   
-  const reportMatch = output.match(/\[report\]([\s\S]*?)\[\/report\]/i);
+  // Parse REPORT: section
+  const reportMatch = output.match(/REPORT:\s*([\s\S]*?)(?=SUMMARY:|$)/i);
   if (reportMatch) {
     report = reportMatch[1].trim();
   }
   
-  const summaryMatch = output.match(/\[summary\]([\s\S]*?)\[\/summary\]/i);
+  // Parse SUMMARY: section
+  const summaryMatch = output.match(/SUMMARY:\s*([\s\S]*?)$/i);
   if (summaryMatch) {
     summary = summaryMatch[1].trim();
-  }
-  
-  // If no closing tag, try to extract anyway
-  if (!summary && output.includes('[summary]')) {
-    const summaryStart = output.indexOf('[summary]') + '[summary]'.length;
-    summary = output.slice(summaryStart).trim();
   }
   
   return { report, summary };
 }
 
-// Main two-tool analysis function
+// Main two-tool analysis function (returns REPORT + SUMMARY)
 async function runTwoToolAnalysis(
   dataRefs: string[],
   question: string,
   pilotVariables: Map<string, any>,
   model: string,
   sendEvent: (data: any) => void
-): Promise<{ summary: string; visuals: ParsedVisual[]; error?: string }> {
+): Promise<{ report: string; summary: string; availableVars: string[]; error?: string }> {
   const client = createOpenRouterClient();
   
   // Reset analysis variables
@@ -6885,19 +7048,23 @@ async function runTwoToolAnalysis(
   
   let plannerOutput = '';
   try {
-    const plannerResponse = await client.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: plannerPrompt },
-        { role: 'user', content: 'Write your operations now:' }
-      ],
-      temperature: 0.3,
-      max_tokens: 1500
-    });
+    // Use retry wrapper for Execution Planner
+    const plannerResponse = await retryLLMCall(
+      () => client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: plannerPrompt },
+          { role: 'user', content: 'Write your operations now:' }
+        ],
+        temperature: 0.3
+      }),
+      (res) => res.choices[0]?.message?.content || '',
+      'Execution Planner'
+    );
     plannerOutput = plannerResponse.choices[0]?.message?.content || '';
   } catch (error: any) {
     console.error(`[Execution Planner] Error:`, error.message);
-    return { summary: 'Analysis failed - Execution Planner error', visuals: [], error: error.message };
+    return { report: '', summary: 'Analysis failed - Execution Planner error', availableVars: [], error: error.message };
   }
   
   console.log(`\n📝 PLANNER OUTPUT:\n${plannerOutput}\n`);
@@ -6907,7 +7074,7 @@ async function runTwoToolAnalysis(
   console.log(`\n✅ Parsed ${operations.length} operations`);
   
   if (operations.length === 0) {
-    return { summary: 'Analysis failed - no operations parsed from planner', visuals: [], error: 'No operations' };
+    return { report: '', summary: 'Analysis failed - no operations parsed from planner', availableVars: [], error: 'No operations' };
   }
   
   // ==========================================
@@ -6940,9 +7107,15 @@ async function runTwoToolAnalysis(
   // ==========================================
   // TOOL 2: Report Writer
   // ==========================================
-  console.log(`\n${'─'.repeat(40)}`);
+  console.log(`\n${'═'.repeat(80)}`);
   console.log(`📝 TOOL 2: REPORT WRITER`);
+  console.log(`${'═'.repeat(80)}`);
+  console.log(`\n📥 INPUT TO REPORT WRITER:`);
   console.log(`${'─'.repeat(40)}`);
+  console.log(`Question: "${question}"`);
+  console.log(`\nExecution Results Available:`);
+  console.log(executionResultsContext.split('\n').map(l => `   ${l}`).join('\n'));
+  console.log(`${'─'.repeat(40)}\n`);
   
   sendEvent({ type: 'analysis_phase', phase: 'reporting' });
   
@@ -6950,45 +7123,73 @@ async function runTwoToolAnalysis(
   
   let reportOutput = '';
   try {
-    const reportResponse = await client.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: reportPrompt },
-        { role: 'user', content: 'Write your [report] and [summary] now:' }
-      ],
-      temperature: 0.4,
-      max_tokens: 2000
-    });
+    // Use retry wrapper for Report Writer
+    const reportResponse = await retryLLMCall(
+      () => client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: reportPrompt },
+          { role: 'user', content: 'Write your REPORT and SUMMARY now:' }
+        ],
+        temperature: 0.4
+      }),
+      (res) => res.choices[0]?.message?.content || '',
+      'Report Writer'
+    );
     reportOutput = reportResponse.choices[0]?.message?.content || '';
   } catch (error: any) {
     console.error(`[Report Writer] Error:`, error.message);
-    return { summary: 'Analysis failed - Report Writer error', visuals: [], error: error.message };
+    return { report: '', summary: 'Analysis failed - Report Writer error', availableVars: [], error: error.message };
   }
-  
-  console.log(`\n📝 REPORT WRITER OUTPUT:\n${reportOutput}\n`);
-  
-  // Parse report and summary
-  const { report, summary } = parseReportWriterOutput(reportOutput);
-  
-  if (!report) {
-    console.log(`⚠️ No [report] block found`);
-  }
-  if (!summary) {
-    console.log(`⚠️ No [summary] block found`);
-  }
-  
-  // Parse visuals from report
-  const { visuals } = parseAnalysisReport(report);
   
   console.log(`\n${'═'.repeat(80)}`);
-  console.log(`✅ ANALYSIS COMPLETE`);
-  console.log(`   Visuals: ${visuals.length}`);
-  console.log(`   Summary: ${summary.slice(0, 100)}...`);
+  console.log(`📤 REPORT WRITER RAW OUTPUT`);
+  console.log(`${'═'.repeat(80)}`);
+  console.log(reportOutput);
   console.log(`${'═'.repeat(80)}\n`);
   
-  sendEvent({ type: 'analysis_complete', summary: summary.slice(0, 200), visualCount: visuals.length });
+  // Parse REPORT and SUMMARY sections
+  const { report, summary } = parseReportWriterOutput(reportOutput);
   
-  return { summary: summary || 'Analysis complete', visuals };
+  console.log(`\n${'─'.repeat(80)}`);
+  console.log(`📋 PARSED REPORT WRITER OUTPUT`);
+  console.log(`${'─'.repeat(80)}`);
+  
+  if (!report) {
+    console.log(`⚠️ No REPORT: section found`);
+  } else {
+    console.log(`\n✅ REPORT:`);
+    console.log(`${'─'.repeat(40)}`);
+    console.log(report);
+    console.log(`${'─'.repeat(40)}`);
+  }
+  
+  if (!summary) {
+    console.log(`⚠️ No SUMMARY: section found`);
+  } else {
+    console.log(`\n✅ SUMMARY:`);
+    console.log(`${'─'.repeat(40)}`);
+    console.log(summary);
+    console.log(`${'─'.repeat(40)}`);
+  }
+  
+  // Get list of available analysis variables (columns only, no tables)
+  const availableVarsList: string[] = [];
+  for (const [name, variable] of analysisVariables) {
+    if (variable.type === 'column') {
+      availableVarsList.push(name);
+    }
+  }
+  
+  console.log(`\n✅ Available analysis variables: ${availableVarsList.join(', ') || 'none'}`);
+  
+  console.log(`\n${'═'.repeat(80)}`);
+  console.log(`✅ REPORT WRITER COMPLETE`);
+  console.log(`${'═'.repeat(80)}\n`);
+  
+  sendEvent({ type: 'analysis_complete', summary: summary?.slice(0, 200), availableVars: availableVarsList });
+  
+  return { report: report || '', summary: summary || '', availableVars: availableVarsList };
 }
 
 // ================================================================================
@@ -7962,15 +8163,16 @@ function executeGeneratedUIComponents(
 }
 
 // Complete Data Analysis flow: two-tool architecture (Execution Planner + Report Writer)
-async function runDataAnalysisWithVisuals(
+// Returns REPORT (display instructions) + SUMMARY (for Pilot)
+async function runDataAnalysis(
   dataRefs: string[],
   question: string,
   pilotVariables: Map<string, any>,
   model: string,
   sendEvent: (data: any) => void
-): Promise<{ summary: string; generatedDSL: string[]; error?: string }> {
+): Promise<{ report: string; summary: string; availableVars: string[]; error?: string }> {
   
-  // Use the new two-tool analysis system
+  // Use the two-tool analysis system
   const analysisResult = await runTwoToolAnalysis(
     dataRefs,
     question,
@@ -7979,34 +8181,218 @@ async function runDataAnalysisWithVisuals(
     sendEvent
   );
   
-  if (analysisResult.error && analysisResult.visuals.length === 0) {
-    return { summary: analysisResult.summary, generatedDSL: [], error: analysisResult.error };
-  }
-  
-  // Render the visuals from the report (fully programmatic, no LLM)
-  sendEvent({ type: 'analysis_phase', phase: 'rendering', visualCount: analysisResult.visuals.length });
-  const rawDSL = renderReportVisuals(
-    analysisResult.visuals,
-    pilotVariables,
-    sendEvent
-  );
-  
-  // Execute the UI components
-  const executedDSL = executeGeneratedUIComponents(
-    rawDSL,
-    pilotVariables,
-    sendEvent
-  );
-  
-  return {
-    summary: analysisResult.summary,
-    generatedDSL: executedDSL
-  };
+  return analysisResult;
 }
 
 // ================================================================================
 // END OF DATA ANALYSIS AGENT - Phase 3
 // ================================================================================
+
+// ================================================================================
+// DISPLAY REPORT TOOL - Renders analysis report to UI
+// ================================================================================
+
+// Execute display_report tool - parses natural language report and generates UI
+async function executeDisplayReportTool(
+  reportVarName: string,
+  variables: Map<string, PilotVariable>,
+  model: string,
+  sendEvent: (data: any) => void
+): Promise<{ dslList: string[]; message: string }> {
+  const client = createOpenRouterClient();
+  
+  console.log(`\n${'═'.repeat(80)}`);
+  console.log(`🎨 DISPLAY REPORT TOOL`);
+  console.log(`${'═'.repeat(80)}`);
+  console.log(`   Variable: ${reportVarName}`);
+  
+  // Get the report from the variable
+  const reportVar = variables.get(reportVarName);
+  if (!reportVar || !reportVar.actualData) {
+    console.log(`   ❌ Variable '${reportVarName}' not found`);
+    return { dslList: [], message: `Error: Variable '${reportVarName}' not found` };
+  }
+  
+  const reportContent = reportVar.actualData.report;
+  if (!reportContent) {
+    console.log(`   ❌ No report content in variable`);
+    return { dslList: [], message: `Error: No report content in '${reportVarName}'` };
+  }
+  
+  console.log(`\n📄 REPORT CONTENT:`);
+  console.log(`${'─'.repeat(60)}`);
+  console.log(reportContent);
+  console.log(`${'─'.repeat(60)}\n`);
+  
+  sendEvent({ type: 'display_report_started', variable: reportVarName });
+  
+  // Build available variables context for the DSL generator
+  let availableVarsContext = '## AVAILABLE VARIABLES\n\n';
+  for (const [name, variable] of variables) {
+    if (variable.actualData) {
+      if (Array.isArray(variable.actualData)) {
+        const fields = variable.actualData.length > 0 && typeof variable.actualData[0] === 'object' 
+          ? Object.keys(variable.actualData[0]).join(', ')
+          : 'values';
+        availableVarsContext += `• ${name}: array of ${variable.actualData.length} items with fields: ${fields}\n`;
+      } else if (typeof variable.actualData === 'object') {
+        availableVarsContext += `• ${name}: object with fields: ${Object.keys(variable.actualData).join(', ')}\n`;
+      }
+    }
+  }
+  
+  // Also include analysis variables
+  for (const [name, analysisVar] of analysisVariables) {
+    if (analysisVar.type === 'column') {
+      availableVarsContext += `• ${name}: column with ${analysisVar.data.length} values\n`;
+    } else if (analysisVar.type === 'number') {
+      availableVarsContext += `• ${name}: number = ${analysisVar.data}\n`;
+    }
+  }
+  
+  // Use LLM to convert natural language report to DSL
+  const prompt = `# DSL GENERATOR
+
+Convert the natural language report into executable DSL commands.
+
+${availableVarsContext}
+
+## REPORT TO CONVERT
+${reportContent}
+
+## DSL SYNTAX
+
+### TABLE
+\`\`\`
+table: (columns: ["Col1", "Col2"], data: <resolved_data>, caption: "Title")
+\`\`\`
+To get data: For each column, extract from variable like: variable_name.map(row => [row.field1, row.field2])
+The data should be an array of objects with column names as keys.
+
+### LINE-CHART
+\`\`\`
+line-chart: [(data: <array_of_xy>, x-data: x, y-data: y, colour: #3b82f6, title: "Title", label_x: "X Label", label_y: "Y Label"), chart_id]
+\`\`\`
+The data should be: [{x: value1, y: value1}, {x: value2, y: value2}, ...]
+
+### CARD
+\`\`\`
+card: (title: "", content: "## Heading\\n\\nMarkdown content here")
+\`\`\`
+Use \\n for newlines, escape quotes with \\"
+
+## OUTPUT FORMAT
+
+Output ONLY valid DSL commands, one per line. Nothing else.
+For tables and charts, I will resolve the variable references - just use: VAR:variable_name[field] for data references.
+
+Example output:
+table: (columns: ["Date", "Sessions"], data: VAR:daily_traffic[date,sessions], caption: "Daily Traffic")
+line-chart: [(data: VAR:daily_traffic[date,sessions], x-data: x, y-data: y, colour: #3b82f6, title: "Sessions Trend", label_x: "Date", label_y: "Sessions"), chart_1]
+card: (title: "", content: "## Analysis Summary\\n\\n**Total:** 15,234 sessions\\n\\n- Trend is positive\\n- Peak on day 15")
+
+Generate the DSL now:`;
+
+  console.log(`\n🔄 GENERATING DSL...`);
+  
+  let dslOutput = '';
+  try {
+    const response = await retryLLMCall(
+      () => client.chat.completions.create({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2
+      }),
+      (res) => res.choices[0]?.message?.content || '',
+      'Display Report DSL Generator'
+    );
+    dslOutput = response.choices[0]?.message?.content || '';
+  } catch (error: any) {
+    console.log(`   ❌ DSL Generation Error: ${error.message}`);
+    return { dslList: [], message: `Error generating DSL: ${error.message}` };
+  }
+  
+  console.log(`\n📤 RAW DSL OUTPUT:`);
+  console.log(`${'─'.repeat(60)}`);
+  console.log(dslOutput);
+  console.log(`${'─'.repeat(60)}\n`);
+  
+  // Parse and execute each DSL line
+  const dslLines = dslOutput.split('\n').filter(line => line.trim() && !line.trim().startsWith('#'));
+  const executedDSL: string[] = [];
+  
+  for (const line of dslLines) {
+    let processedLine = line.trim();
+    
+    // Skip empty lines and comments
+    if (!processedLine || processedLine.startsWith('```')) continue;
+    
+    // Resolve VAR: references
+    const varRefs = processedLine.matchAll(/VAR:([a-zA-Z_][a-zA-Z0-9_]*)\[([^\]]+)\]/g);
+    for (const match of varRefs) {
+      const [fullMatch, varName, fields] = match;
+      const fieldList = fields.split(',').map(f => f.trim());
+      
+      // Resolve the data
+      const resolvedData = resolveVariableDataForDSL(varName, fieldList, variables);
+      if (resolvedData) {
+        processedLine = processedLine.replace(fullMatch, JSON.stringify(resolvedData));
+      }
+    }
+    
+    console.log(`   📝 Processing: ${processedLine.slice(0, 100)}...`);
+    executedDSL.push(processedLine);
+  }
+  
+  console.log(`\n✅ GENERATED ${executedDSL.length} DSL COMMANDS`);
+  for (let i = 0; i < executedDSL.length; i++) {
+    console.log(`   ${i + 1}. ${executedDSL[i].slice(0, 80)}${executedDSL[i].length > 80 ? '...' : ''}`);
+  }
+  console.log(`${'═'.repeat(80)}\n`);
+  
+  sendEvent({ type: 'display_report_complete', count: executedDSL.length });
+  
+  return { dslList: executedDSL, message: `Report displayed on canvas (${executedDSL.length} components)` };
+}
+
+// Helper to resolve variable data for DSL generation
+function resolveVariableDataForDSL(
+  varName: string,
+  fields: string[],
+  variables: Map<string, PilotVariable>
+): any {
+  // Check pilot variables first
+  const pilotVar = variables.get(varName);
+  if (pilotVar && pilotVar.actualData) {
+    if (Array.isArray(pilotVar.actualData)) {
+      // For line-chart: return [{x: ..., y: ...}, ...]
+      if (fields.length === 2) {
+        return pilotVar.actualData.map(item => ({
+          x: item[fields[0]],
+          y: item[fields[1]]
+        }));
+      }
+      // For table: return array of objects
+      return pilotVar.actualData.map(item => {
+        const obj: Record<string, any> = {};
+        for (const field of fields) {
+          obj[field] = item[field];
+        }
+        return obj;
+      });
+    }
+  }
+  
+  // Check analysis variables
+  const analysisVar = analysisVariables.get(varName);
+  if (analysisVar) {
+    if (analysisVar.type === 'column') {
+      return analysisVar.data;
+    }
+  }
+  
+  return null;
+}
 
 // Execute UI tools (line-chart, table, card, alert)
 function executeUITool(
@@ -8146,12 +8532,16 @@ async function runExecutorAgent(
   });
   
   try {
-    const response = await client.chat.completions.create({
-      model,
-      messages,
-      temperature: 0.3,
-      max_tokens: 800
-    });
+    // Use retry wrapper for Executor Agent
+    const response = await retryLLMCall(
+      () => client.chat.completions.create({
+        model,
+        messages,
+        temperature: 0.3
+      }),
+      (res) => res.choices[0]?.message?.content || '',
+      'Executor Agent'
+    );
     
     const executorResponse = response.choices[0]?.message?.content || '';
     
@@ -8196,10 +8586,11 @@ async function runExecutorAgent(
     
     // Execute the tool
     if (call.toolName === 'llm') {
-      // LLM tool - now uses Data Analysis Agent
+      // LLM tool - Data Analysis Agent, stores result in variable
       const parsedRefs: string[] = [];
       
       console.log(`[Executor LLM/Analysis] Raw call.args: ${JSON.stringify(call.args)}`);
+      console.log(`[Executor LLM/Analysis] Variable name: ${call.variableName}`);
       
       // The args might be a string (raw args) or object (parsed key-value pairs)
       let dataStr = '';
@@ -8238,12 +8629,13 @@ async function runExecutorAgent(
       // Print Analysis Agent call to terminal
       console.log(`\n${'='.repeat(70)}`);
       console.log(`📊 DATA ANALYSIS AGENT CALLED`);
+      console.log(`   Variable: ${call.variableName || '(none)'}`);
       console.log(`   Data refs: ${parsedRefs.join(', ')}`);
       console.log(`   Question: ${question}`);
       console.log(`${'='.repeat(70)}\n`);
       
-      // Use the new Data Analysis Agent with visuals
-      const analysisResult = await runDataAnalysisWithVisuals(
+      // Use the Data Analysis Agent (returns REPORT + SUMMARY)
+      const analysisResult = await runDataAnalysis(
         parsedRefs,
         question,
         variables as Map<string, any>,
@@ -8251,24 +8643,46 @@ async function runExecutorAgent(
         sendEvent
       );
       
-      // Add generated DSL to the output
-      for (const dsl of analysisResult.generatedDSL) {
-        generatedDSL.push(dsl);
-      }
-      
-      // Print Analysis summary to terminal
+      // Print Analysis report to terminal
       console.log(`\n${'='.repeat(70)}`);
       console.log(`📊 DATA ANALYSIS COMPLETE`);
-      console.log(`   Summary: ${analysisResult.summary.slice(0, 500)}`);
-      console.log(`   Visuals generated: ${analysisResult.generatedDSL.length}`);
+      console.log(`${'─'.repeat(70)}`);
+      console.log(`REPORT (stored in variable):`);
+      console.log(analysisResult.report);
+      console.log(`${'─'.repeat(70)}`);
+      console.log(`SUMMARY (sent to Pilot):`);
+      console.log(analysisResult.summary);
+      console.log(`${'─'.repeat(70)}`);
+      console.log(`Available analysis vars: ${analysisResult.availableVars.join(', ') || 'none'}`);
       if (analysisResult.error) {
-        console.log(`   Error: ${analysisResult.error}`);
+        console.log(`Error: ${analysisResult.error}`);
       }
       console.log(`${'='.repeat(70)}\n`);
       
-      // Only the summary goes back to the Pilot
-      toolResponse = `Analysis complete. Summary: ${analysisResult.summary}`;
-      report = `Data Analysis Agent completed. ${analysisResult.generatedDSL.length} visualizations created. Summary: ${analysisResult.summary}`;
+      // Store the report in a variable (like other tools)
+      if (call.variableName) {
+        variables.set(call.variableName, {
+          name: call.variableName,
+          schema: {
+            report: { description: 'Full analysis report with display instructions', data_type: 'string' },
+            summary: { description: 'Concise summary of key findings', data_type: 'string' }
+          },
+          actualData: {
+            report: analysisResult.report,
+            summary: analysisResult.summary
+          },
+          description: `Analysis report: ${analysisResult.summary.slice(0, 100)}...`
+        });
+        newVariables.push(call.variableName);
+        
+        // ACK to Executor, Summary to Pilot
+        toolResponse = `Stored in '${call.variableName}'`;
+        report = `Data Analysis complete. Stored in '${call.variableName}'. Summary: ${analysisResult.summary}`;
+      } else {
+        // No variable name - just return summary
+        toolResponse = `Analysis complete (no variable to store)`;
+        report = `Data Analysis complete. Summary: ${analysisResult.summary}`;
+      }
     }
     else if (call.toolName === 'extractor') {
       // Extractor tool - extracts specific values from variables
@@ -8364,6 +8778,53 @@ async function runExecutorAgent(
         toolResponse = `Extraction completed but no variable name provided to store the result.`;
         report = `Extractor ran but result was not stored (no variable name).`;
       }
+    }
+    else if (call.toolName === 'display_report') {
+      // Display Report tool - renders analysis report to UI
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`🎨 DISPLAY REPORT TOOL`);
+      console.log(`${'='.repeat(60)}\n`);
+      
+      // Parse the report variable name from args
+      let reportVarName = '';
+      if (typeof call.args === 'string') {
+        // Extract variable name from args string
+        reportVarName = call.args.trim().replace(/[()'"]/g, '');
+      } else if (typeof call.args === 'object' && call.args.report) {
+        reportVarName = call.args.report;
+      }
+      
+      // Also check if it's in the raw call
+      if (!reportVarName && call.raw) {
+        const match = call.raw.match(/display_report\s*\(\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\)/i);
+        if (match) {
+          reportVarName = match[1];
+        }
+      }
+      
+      console.log(`   Report variable: ${reportVarName || '(not found)'}`);
+      
+      if (!reportVarName) {
+        toolResponse = `Error: No report variable specified`;
+        report = `display_report failed - no variable name provided`;
+      } else {
+        const result = await executeDisplayReportTool(
+          reportVarName,
+          variables as Map<string, PilotVariable>,
+          model,
+          sendEvent
+        );
+        
+        // Add all generated DSL to the output
+        for (const dsl of result.dslList) {
+          generatedDSL.push(dsl);
+        }
+        
+        toolResponse = result.message;
+        report = result.message;
+      }
+      
+      console.log(`   ✅ ${toolResponse}`);
     }
     else if (['line-chart', 'table', 'card', 'alert'].includes(call.toolName)) {
       // UI tools
@@ -8549,10 +9010,8 @@ async function runPilotAgent(
   variables: Map<string, PilotVariable>,
   pilotHistory: Array<{ role: string; content: string }>,
   model: string,
-  sendEvent: (data: any) => void,
-  retryCount: number = 0
+  sendEvent: (data: any) => void
 ): Promise<{ action: 'EXECUTOR' | 'REPLY'; content: string }> {
-  const MAX_RETRIES = 3;
   const client = createOpenRouterClient();
   
   const toolSummaries = buildToolSummariesForPilot();
@@ -8567,10 +9026,8 @@ async function runPilotAgent(
     userContent = `USER REQUEST:\n${userMessage}\n\nWhat is your FIRST STEP to address this request?\n\nRemember: Give ONE instruction at a time. You'll see the results before deciding the next step.\n\n(EXECUTOR: single step instruction OR REPLY: if you can answer directly)`;
   }
   
-  // Only add to history on first attempt (not retries)
-  if (retryCount === 0) {
-    pilotHistory.push({ role: 'user', content: userContent });
-  }
+  // Add to history
+  pilotHistory.push({ role: 'user', content: userContent });
   
   const messages: any[] = [
     { role: 'system', content: systemPrompt },
@@ -8580,38 +9037,29 @@ async function runPilotAgent(
   sendEvent({
     type: 'pilot_thinking',
     historyLength: pilotHistory.length,
-    variableCount: variables.size,
-    retry: retryCount > 0 ? retryCount : undefined
+    variableCount: variables.size
   });
   
   // Send the LLM request details
   sendEvent({
     type: 'pilot_llm_request',
     systemPromptPreview: systemPrompt.slice(0, 500) + '...',
-    userContent,
-    retry: retryCount > 0 ? retryCount : undefined
+    userContent
   });
   
   try {
-    const response = await client.chat.completions.create({
-      model,
-      messages,
-      temperature: 0.3,
-      max_tokens: 1500
-    });
+    // Use retry wrapper for Pilot Agent
+    const response = await retryLLMCall(
+      () => client.chat.completions.create({
+        model,
+        messages,
+        temperature: 0.3
+      }),
+      (res) => res.choices[0]?.message?.content || '',
+      'Pilot Agent'
+    );
     
     const pilotResponse = response.choices[0]?.message?.content || '';
-    
-    // Check if response is empty or invalid - retry if so
-    if (!pilotResponse || pilotResponse.trim() === '') {
-      console.log(`[Pilot] Empty response, retry ${retryCount + 1}/${MAX_RETRIES}`);
-      if (retryCount < MAX_RETRIES) {
-        sendEvent({ type: 'pilot_retry', reason: 'empty_response', attempt: retryCount + 1 });
-        return runPilotAgent(userMessage, executorReport, variables, pilotHistory, model, sendEvent, retryCount + 1);
-      }
-      // Max retries reached, return a fallback
-      return { action: 'REPLY', content: 'I apologize, but I encountered an issue processing your request. Could you please try again?' };
-    }
     
     // Add to history
     pilotHistory.push({ role: 'assistant', content: pilotResponse });
@@ -8644,12 +9092,7 @@ async function runPilotAgent(
     }
     
   } catch (error: any) {
-    console.log(`[Pilot] Error: ${error.message}, retry ${retryCount + 1}/${MAX_RETRIES}`);
-    // Retry on error
-    if (retryCount < MAX_RETRIES) {
-      sendEvent({ type: 'pilot_retry', reason: 'error', error: error.message, attempt: retryCount + 1 });
-      return runPilotAgent(userMessage, executorReport, variables, pilotHistory, model, sendEvent, retryCount + 1);
-    }
+    console.log(`[Pilot] Error after retries: ${error.message}`);
     sendEvent({ type: 'pilot_error', error: error.message });
     return { action: 'REPLY', content: 'I apologize, but I encountered an issue processing your request. Could you please try again?' };
   }
