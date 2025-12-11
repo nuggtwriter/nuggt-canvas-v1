@@ -6899,8 +6899,9 @@ You can use these components in your report:
    Usage: "Create a line chart using <variable_name> with <x_column> on X axis and <y_column> on Y axis"
    
 3. CARD - Display text with markdown formatting
-   Usage: "Create a card with the following content: <markdown text>"
+   Usage: "Create a card titled '<title>' with the following content: <markdown text>"
    Cards support: headings (##), bold (**), italic (*), bullet points (-)
+   Note: Use cards for all manually computed values and summaries - NOT tables or charts
 
 ================================================================================
 ## OUTPUT FORMAT
@@ -6940,8 +6941,7 @@ First, display oct_daily_traffic as a table with columns: date, sessions.
 
 Then create a line chart using oct_daily_traffic with date on X axis and sessions on Y axis.
 
-Create a card with the following content:
-## October Traffic Analysis
+Create a card titled 'October Traffic Analysis' with the following content:
 **Total Sessions:** 15,234
 **Daily Average:** 491 sessions
 
@@ -6950,8 +6950,7 @@ Create a card with the following content:
 - 8 days exceeded 500 sessions
 - Overall healthy engagement
 
-Finally, create a card with the following content:
-## Month-over-Month Comparison
+Finally, create a card titled 'Month-over-Month Comparison' with the following content:
 October: **15,234** sessions
 November: **12,890** sessions
 Change: **-15.4%** decrease
@@ -6970,6 +6969,8 @@ October had 15,234 total sessions, down 15.4% from November's 12,890. Traffic pe
 3. For columns, reference by variable name (you cannot see the values)
 4. Cards should have meaningful analysis, not just raw numbers
 5. SUMMARY must be concise - this is what the Pilot sees
+6. PREFER using variables for tables and charts when available. If no variable exists for computed values (like comparisons or summaries), you may specify the data inline.
+7. Every CARD must have a specific title - always specify the title when creating a card (e.g., "Create a card titled 'Monthly Comparison' with the following content:"). Do NOT repeat the title as a heading (##) inside the card content - the title is already displayed separately.
 
 ================================================================================
 
@@ -8263,33 +8264,46 @@ ${reportContent}
 ## DSL SYNTAX
 
 ### TABLE
+Two options for table data:
+
+**Option 1: Use VAR: reference (when variable is available)**
 \`\`\`
-table: (columns: ["Col1", "Col2"], data: <resolved_data>, caption: "Title")
+table: (columns: ["Col1", "Col2"], data: VAR:variable_name[field1,field2], caption: "Title")
 \`\`\`
-To get data: For each column, extract from variable like: variable_name.map(row => [row.field1, row.field2])
-The data should be an array of objects with column names as keys.
+
+**Option 2: Inline JSON data (when no variable is available)**
+\`\`\`
+table: (columns: ["Col1", "Col2"], data: [{"Col1": "value1", "Col2": "value2"}, {"Col1": "value3", "Col2": "value4"}], caption: "Title")
+\`\`\`
+CRITICAL for inline data: Use VALID JSON format - all keys AND string values must be in double quotes.
 
 ### LINE-CHART
 \`\`\`
-line-chart: [(data: <array_of_xy>, x-data: x, y-data: y, colour: #3b82f6, title: "Title", label_x: "X Label", label_y: "Y Label"), chart_id]
+line-chart: [(data: VAR:variable_name[x_field,y_field], x-data: x, y-data: y, colour: #3b82f6, title: "Title", label_x: "X Label", label_y: "Y Label"), chart_id]
 \`\`\`
-The data should be: [{x: value1, y: value1}, {x: value2, y: value2}, ...]
+For inline data: data: [{"x": "value1", "y": 100}, {"x": "value2", "y": 200}]
 
 ### CARD
 \`\`\`
-card: (title: "", content: "## Heading\\n\\nMarkdown content here")
+card: (title: "Card Title", content: "Markdown content here - do NOT repeat the title as a heading")
 \`\`\`
-Use \\n for newlines, escape quotes with \\"
+Use \\n for newlines, escape quotes with \\". The title is displayed separately, so do NOT include it again as a ## heading in the content.
 
 ## OUTPUT FORMAT
 
 Output ONLY valid DSL commands, one per line. Nothing else.
-For tables and charts, I will resolve the variable references - just use: VAR:variable_name[field] for data references.
 
-Example output:
+**PREFER VAR: references** when a variable is available - I will resolve them to actual data.
+**USE inline JSON** only when you need to display computed values that are NOT stored in a variable.
+
+Example with VAR: references:
 table: (columns: ["Date", "Sessions"], data: VAR:daily_traffic[date,sessions], caption: "Daily Traffic")
 line-chart: [(data: VAR:daily_traffic[date,sessions], x-data: x, y-data: y, colour: #3b82f6, title: "Sessions Trend", label_x: "Date", label_y: "Sessions"), chart_1]
-card: (title: "", content: "## Analysis Summary\\n\\n**Total:** 15,234 sessions\\n\\n- Trend is positive\\n- Peak on day 15")
+
+Example with inline JSON (for computed summaries without variables):
+table: (columns: ["Metric", "October", "November", "Change"], data: [{"Metric": "Sessions", "October": "16,734", "November": "14,900", "Change": "-10.96%"}, {"Metric": "Users", "October": "12,365", "November": "11,200", "Change": "-9.42%"}], caption: "Monthly Comparison")
+
+card: (title: "Analysis Summary", content: "**Total:** 15,234 sessions\\n\\n- Trend is positive\\n- Peak on day 15")
 
 Generate the DSL now:`;
 
@@ -9003,6 +9017,291 @@ async function runExecutorAgent(
   }
 }
 
+// ================================================================================
+// QUERY ORCHESTRATOR - Analyzes user request and creates structured task plan
+// ================================================================================
+
+function buildQueryOrchestratorPrompt(toolSummaries: string): string {
+  return `# QUERY ORCHESTRATOR
+
+You are a Query Orchestrator. Your job is to take a user's request and create a clear, structured task plan for the Pilot Agent.
+
+================================================================================
+## YOUR ROLE
+================================================================================
+
+1. Understand the user's intent (what do they actually want?)
+2. Identify what data is needed
+3. Identify what analysis/processing is needed
+4. Identify what output format the user expects
+5. Break it down into logical phases
+6. Write a clear, actionable plan for the Pilot Agent
+
+================================================================================
+## AVAILABLE CAPABILITIES
+================================================================================
+
+### Data Retrieval Tools
+${toolSummaries}
+
+### Processing Tools
+• llm - Analyze data stored in variables. Performs: sum, average, max, min, count, compare, percentages, filter, sort, correlations. Outputs a REPORT variable and SUMMARY.
+• extractor - Extract specific values from data (e.g., find a specific ID from a list)
+
+### Display Tools
+• display_report - Render an analysis report (tables, charts, cards) to the canvas
+• table - Display data as a table with columns
+• line-chart - Display trends over time as a line chart
+• card - Display text/markdown content
+• alert - Display important notices
+
+### Key Constraints
+- Tools often have DEPENDENCIES (e.g., need account_id from list_accounts before calling get_report)
+- The Pilot can only execute ONE step at a time
+- The Pilot cannot see raw data values, only variable names and schemas
+- Analysis must be done via the llm tool, not by the Pilot directly
+
+================================================================================
+## OUTPUT FORMAT
+================================================================================
+
+You MUST output in this exact format:
+
+INTENT:
+<One sentence describing what the user wants to achieve>
+
+DATA NEEDED:
+<List of data that needs to be fetched, with specific tools if known>
+
+DEPENDENCIES:
+<Any data dependencies - what must be fetched/extracted before other tools can be used>
+
+ANALYSIS REQUIRED:
+<What kind of analysis or processing is needed>
+<Specific metrics, comparisons, or calculations>
+
+OUTPUT FORMAT:
+<What the user expects to see - table, chart, summary, etc.>
+
+TASK PLAN FOR PILOT:
+
+Phase 1: <Description>
+- Step description
+- Step description
+
+Phase 2: <Description>
+- Step description
+- Step description
+
+Phase 3: Display & Response
+- What to display
+- What to tell the user
+
+NOTES FOR PILOT:
+<Any special considerations, edge cases, date ranges, or clarifications>
+
+================================================================================
+## EXAMPLES
+================================================================================
+
+### Example 1: Simple Comparison
+
+User Query: "Compare my sales between Q3 and Q4"
+
+INTENT:
+Compare sales performance metrics between Q3 2025 and Q4 2025 to identify trends and changes.
+
+DATA NEEDED:
+1. List of available accounts/properties (to identify the correct one)
+2. Sales data for Q3 2025 (July-September)
+3. Sales data for Q4 2025 (October-December)
+
+DEPENDENCIES:
+- Must get account list first → extract account ID → then fetch sales reports
+
+ANALYSIS REQUIRED:
+- Calculate totals for each quarter (revenue, units sold, orders)
+- Calculate percentage change between quarters
+- Identify top performing products or categories
+- Compare key metrics: revenue, average order value, conversion rate
+
+OUTPUT FORMAT:
+- Summary card with quarter-over-quarter comparison
+- Line chart showing monthly revenue trend
+- Table with key metrics comparison
+
+TASK PLAN FOR PILOT:
+
+Phase 1: Data Collection
+- Fetch list of accounts to find the correct one
+- Extract the account ID
+- Fetch sales report for Q3 2025
+- Fetch sales report for Q4 2025
+
+Phase 2: Analysis
+- Use llm tool to analyze both quarters' data
+- Calculate totals, averages, and percentage changes
+- Identify key insights and trends
+- Store analysis in a report variable
+
+Phase 3: Display & Response
+- Display the analysis report (will show comparison table, charts, insights)
+- Explain the key findings: which quarter performed better, by how much, any notable patterns
+
+NOTES FOR PILOT:
+- Q3 2025 is 2025-07-01 to 2025-09-30
+- Q4 2025 is 2025-10-01 to 2025-12-31
+- If user hasn't specified which account, may need to ask or use the default/only one
+
+---
+
+### Example 2: Data Display
+
+User Query: "Show me my top customers"
+
+INTENT:
+Display the top performing customers ranked by revenue or order volume.
+
+DATA NEEDED:
+1. Account ID (from list of accounts)
+2. Customer performance data
+
+DEPENDENCIES:
+- Must get account list → extract account ID → then fetch customer report
+
+ANALYSIS REQUIRED:
+- Minimal - data likely comes pre-sorted
+- May want to limit to top 10-20 customers
+
+OUTPUT FORMAT:
+- Table showing customers with key metrics (total revenue, order count, average order value)
+
+TASK PLAN FOR PILOT:
+
+Phase 1: Data Collection
+- Fetch list of accounts
+- Extract account ID
+- Fetch customer report (last 30 days as default)
+
+Phase 2: Display
+- Display customer data as a table with relevant columns
+
+Phase 3: Response
+- Explain what the table shows
+- Highlight the top performer
+
+NOTES FOR PILOT:
+- If no date range specified, default to last 30 days
+- User probably wants top 10-20, not all customers
+
+---
+
+### Example 3: Complex Analysis
+
+User Query: "Which products are underperforming and why? Give me recommendations."
+
+INTENT:
+Identify underperforming products by analyzing sales, returns, and margins, then provide actionable recommendations for improvement.
+
+DATA NEEDED:
+1. Account ID
+2. Product-level sales data
+3. Product return rates if available
+4. Category benchmarks for comparison
+
+DEPENDENCIES:
+- Account ID needed first for all subsequent calls
+
+ANALYSIS REQUIRED:
+- Define "underperforming" criteria (low sales, high returns, low margins)
+- Identify products that meet underperforming criteria
+- Analyze WHY they might be underperforming (pricing, seasonality, competition)
+- Generate recommendations based on the data
+
+OUTPUT FORMAT:
+- Card with summary of findings
+- Table of underperforming products with metrics
+- Card with recommendations
+
+TASK PLAN FOR PILOT:
+
+Phase 1: Data Collection
+- Fetch account list and extract account ID
+- Fetch product performance data
+- Fetch return data if available
+
+Phase 2: Analysis
+- Use llm to analyze product data
+- Identify products with: low revenue, high return rate, declining trend
+- Compare to category averages
+- Generate specific recommendations per issue type
+- Store comprehensive analysis in report variable
+
+Phase 3: Display & Response
+- Display the analysis report
+- Emphasize actionable recommendations
+- Offer to dive deeper into specific products
+
+NOTES FOR PILOT:
+- Underperforming is relative - compare to category or store averages
+- Consider seasonality when analyzing trends
+- Recommendations should be specific and actionable, not generic advice
+
+================================================================================
+
+Now analyze the user's request and create the task plan:`;
+}
+
+// Run the Query Orchestrator
+async function runQueryOrchestrator(
+  userMessage: string,
+  model: string,
+  sendEvent: (data: any) => void
+): Promise<string> {
+  const client = createOpenRouterClient();
+  
+  sendEvent({ type: 'orchestrator_started', userMessage: userMessage.slice(0, 200) });
+  
+  const toolSummaries = buildToolSummariesForPilot();
+  const systemPrompt = buildQueryOrchestratorPrompt(toolSummaries);
+  
+  try {
+    const response = await retryLLMCall(
+      () => client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage }
+        ],
+        temperature: 0.3
+      }),
+      (res) => res.choices[0]?.message?.content || '',
+      'Query Orchestrator'
+    );
+    
+    const orchestratorOutput = response.choices[0]?.message?.content || '';
+    
+    sendEvent({ 
+      type: 'orchestrator_complete', 
+      planPreview: orchestratorOutput.slice(0, 500) + '...'
+    });
+    
+    console.log(`\n${'═'.repeat(80)}`);
+    console.log(`🎯 QUERY ORCHESTRATOR OUTPUT`);
+    console.log(`${'═'.repeat(80)}`);
+    console.log(orchestratorOutput);
+    console.log(`${'═'.repeat(80)}\n`);
+    
+    return orchestratorOutput;
+    
+  } catch (error: any) {
+    console.log(`[Orchestrator] Error: ${error.message}`);
+    sendEvent({ type: 'orchestrator_error', error: error.message });
+    // On error, just return the original message so Pilot can still try
+    return userMessage;
+  }
+}
+
 // Run the Pilot agent for one turn
 async function runPilotAgent(
   userMessage: string,
@@ -9120,6 +9419,24 @@ async function runPilotSystem(
   // Initialize pilot history from conversation history
   const pilotHistory: Array<{ role: string; content: string }> = [...conversationHistory];
   
+  // ========================================================================
+  // QUERY ORCHESTRATOR - Analyze request and create task plan
+  // ========================================================================
+  sendEvent({ type: 'orchestrator_starting' });
+  
+  const orchestratedPlan = await runQueryOrchestrator(userMessage, model, sendEvent);
+  
+  // Combine original user message with orchestrated plan for the Pilot
+  const enrichedMessage = `## ORIGINAL USER REQUEST
+${userMessage}
+
+## TASK PLAN (from Query Orchestrator)
+${orchestratedPlan}
+
+Follow the task plan above, executing ONE step at a time.`;
+  
+  // ========================================================================
+  
   let isComplete = false;
   let finalMessage = '';
   let executorReport: string | null = null;
@@ -9142,9 +9459,9 @@ async function runPilotSystem(
       hasExecutorReport: !!executorReport
     });
     
-    // Run Pilot
+    // Run Pilot with enriched message (includes orchestrated plan)
     const pilotResult = await runPilotAgent(
-      userMessage,
+      enrichedMessage,
       executorReport,
       variables,
       pilotHistory,
