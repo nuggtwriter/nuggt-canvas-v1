@@ -4267,7 +4267,7 @@ DISPLAY: <natural language instruction for what to display>
 
 Available display tools:
 - table: Display data in a table format
-- line-chart: Display data as a line chart
+- line-chart: Display data as a line chart (supports multiple lines for comparison)
 - card: Display text/insights in a card
 
 Examples:
@@ -4397,7 +4397,7 @@ ${toolSummaries}
 
 ### DISPLAY Agent Tools (use via DISPLAY:)
 • table - Display data as a table (use variable references)
-• line-chart - Display data as a line chart (use variable references)
+• line-chart - Display data as a line chart (supports multiple lines for comparison with different colors and legend)
 • card - Display markdown content (for your insights and findings)
 
 ⚠️ IMPORTANT WORKFLOW:
@@ -4643,17 +4643,12 @@ Example with analysis variable:
     
     if (toolId === 'line-chart') {
       result += `### line-chart
-Display data as a line chart on the Canvas. Great for showing trends over time.
+Display data as a line chart on the Canvas. Supports single or multiple lines for comparison.
 
-Syntax: \`line-chart(x_data: var[x_field], y_data: var[y_field], x_label: "X Axis", y_label: "Y Axis", colour: "#3b82f6")\`
+Single line: \`line-chart(x_data: var[x_field], y_data: var[y_field], x_label: "X", y_label: "Y", colour: "#hex")\`
+Multi-line: \`line-chart(x_data: var[date], x_label: "Date", y_label: "Value", title: "Title", lines: [{y_data: var1[col], label: "Label1", colour: "#hex1"}, {y_data: var2[col], label: "Label2", colour: "#hex2"}])\`
+
 Returns: Confirmation that chart was displayed
-
-You can use:
-- Original data variables: daily_traffic[date], daily_traffic[sessions]
-- Analysis variables: sorted_sessions, filtered_data
-
-Example:
-\`line-chart(x_data: daily_traffic[date], y_data: daily_traffic[sessions], x_label: "Date", y_label: "Sessions")\`
 
 `;
     }
@@ -5040,11 +5035,12 @@ function parseToolCalls(response: string): Array<{
     } else if (cleanedArgs.startsWith('{')) {
       args = cleanedArgs;
     } else {
-      // Key-value pairs - need to track both bracket and quote depth
+      // Key-value pairs - need to track bracket, brace, and quote depth
       args = {};
       const kvPairs: string[] = [];
       let current = '';
       let bracketDepth = 0;
+      let braceDepth = 0;
       let inQuotes = false;
       let quoteChar = '';
       
@@ -5063,14 +5059,16 @@ function parseToolCalls(response: string): Array<{
           }
         }
         
-        // Track brackets (only when not in quotes)
+        // Track brackets and braces (only when not in quotes)
         if (!inQuotes) {
           if (char === '[') bracketDepth++;
           else if (char === ']') bracketDepth--;
+          else if (char === '{') braceDepth++;
+          else if (char === '}') braceDepth--;
         }
         
-        // Split on comma only when not in quotes and not in brackets
-        if (char === ',' && bracketDepth === 0 && !inQuotes) {
+        // Split on comma only when not in quotes, not in brackets, and not in braces
+        if (char === ',' && bracketDepth === 0 && braceDepth === 0 && !inQuotes) {
           kvPairs.push(current.trim());
           current = '';
         } else {
@@ -7195,13 +7193,20 @@ function executeAnalysisOperation(parsed: ParsedOperation, pilotVariables: Map<s
       
       // Get comparison value (could be a stored variable or a number)
       let compareValue: number | string;
-      const storedNum = getStoredNumber(valueStr.trim());
+      let cleanValueStr = valueStr.trim();
+      // Strip surrounding quotes if present (e.g., 'google' or "google" -> google)
+      if ((cleanValueStr.startsWith("'") && cleanValueStr.endsWith("'")) ||
+          (cleanValueStr.startsWith('"') && cleanValueStr.endsWith('"'))) {
+        cleanValueStr = cleanValueStr.slice(1, -1);
+      }
+      
+      const storedNum = getStoredNumber(cleanValueStr);
       if (storedNum !== null) {
         compareValue = storedNum;
-      } else if (/^[\d.-]+$/.test(valueStr.trim())) {
-        compareValue = parseFloat(valueStr.trim());
+      } else if (/^[\d.-]+$/.test(cleanValueStr)) {
+        compareValue = parseFloat(cleanValueStr);
       } else {
-        compareValue = valueStr.trim();
+        compareValue = cleanValueStr;
       }
       
       // Find the first matching index
@@ -9719,25 +9724,74 @@ function executeUITool(
   
   switch (toolName) {
     case 'line-chart': {
-      const xData = resolveVariableRef(args.x_data || args.xData, variables);
-      const yData = resolveVariableRef(args.y_data || args.yData, variables);
       const xLabel = args.x_label || args.xLabel || 'X';
       const yLabel = args.y_label || args.yLabel || 'Y';
-      const colour = args.colour || args.color || '#2563eb';
+      const title = args.title || `${yLabel} over ${xLabel}`;
       
-      // Build chart data
-      const chartData = [];
-      if (Array.isArray(xData) && Array.isArray(yData)) {
-        for (let i = 0; i < Math.min(xData.length, yData.length); i++) {
-          chartData.push({ x: xData[i], y: yData[i] });
+      // Check if multi-line format (lines array) or single-line format
+      let chartData: any[] = [];
+      let yDataKeys: string[] = [];
+      let colours: string[] = [];
+      
+      if (args.lines && typeof args.lines === 'string') {
+        // Parse lines array from string: [{y_data: var[col], label: "Label", colour: "#hex"}, ...]
+        console.log(`[line-chart] Parsing multi-line format: ${args.lines}`);
+        
+        // Get x data first
+        const xData = resolveVariableRef(args.x_data || args.xData, variables);
+        if (!Array.isArray(xData)) {
+          return { dsl: '', message: 'Error: x_data must reference an array' };
         }
+        
+        // Initialize chart data with x values
+        chartData = xData.map((x, i) => ({ x }));
+        
+        // Parse each line definition
+        const lineMatches = args.lines.matchAll(/\{\s*y_data\s*:\s*([^,}]+)\s*,\s*label\s*:\s*["']([^"']+)["']\s*(?:,\s*colou?r\s*:\s*["']?([^"'\s}]+)["']?)?\s*\}/gi);
+        
+        let lineIndex = 0;
+        for (const match of lineMatches) {
+          const [, yDataRef, label, colour] = match;
+          const yData = resolveVariableRef(yDataRef.trim(), variables);
+          
+          if (Array.isArray(yData)) {
+            // Use label as the key (sanitize for JSON)
+            const safeLabel = label.replace(/[^a-zA-Z0-9_]/g, '_');
+            yDataKeys.push(safeLabel);
+            colours.push(colour || ['#2563eb', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'][lineIndex % 5]);
+            
+            // Add y values to chart data
+            for (let i = 0; i < Math.min(chartData.length, yData.length); i++) {
+              chartData[i][safeLabel] = yData[i];
+            }
+            lineIndex++;
+          }
+        }
+        
+        console.log(`[line-chart] Parsed ${lineIndex} lines: ${yDataKeys.join(', ')}`);
+      } else {
+        // Single-line format (backward compatible)
+        const xData = resolveVariableRef(args.x_data || args.xData, variables);
+        const yData = resolveVariableRef(args.y_data || args.yData, variables);
+        const colour = args.colour || args.color || '#2563eb';
+        
+        if (Array.isArray(xData) && Array.isArray(yData)) {
+          for (let i = 0; i < Math.min(xData.length, yData.length); i++) {
+            chartData.push({ x: xData[i], y: yData[i] });
+          }
+        }
+        
+        yDataKeys = ['y'];
+        colours = [colour];
       }
       
       const dataStr = JSON.stringify(chartData).replace(/"/g, '"');
-      const dsl = `line-chart: [(data: ${dataStr}, x-data: x, y-data: y, colour: ${colour}, title: "${yLabel} over ${xLabel}", label_x: "${xLabel}", label_y: "${yLabel}"), chart_${Date.now()}]`;
+      const yDataStr = yDataKeys.join('|');
+      const colourStr = colours.join('|');
+      const dsl = `line-chart: [(data: ${dataStr}, x-data: x, y-data: ${yDataStr}, colour: ${colourStr}, title: "${title}", label_x: "${xLabel}", label_y: "${yLabel}"), chart_${Date.now()}]`;
       
-      sendEvent({ type: 'ui_created', tool: 'line-chart', dslPreview: dsl.slice(0, 100) });
-      return { dsl, message: 'Line chart displayed to user' };
+      sendEvent({ type: 'ui_created', tool: 'line-chart', dslPreview: dsl.slice(0, 100), lines: yDataKeys.length });
+      return { dsl, message: `Line chart displayed with ${yDataKeys.length} line(s)` };
     }
     
     case 'table': {
@@ -11316,16 +11370,23 @@ Example with analysis variable:
 
 ### line-chart
 Display data as a line chart on the Canvas. Great for showing trends over time.
+Supports SINGLE line or MULTIPLE lines for comparison.
 
-Syntax: \`line-chart(x_data: var[x_field], y_data: var[y_field], x_label: "X Axis", y_label: "Y Axis", colour: "#3b82f6")\`
+**Single line syntax:**
+\`line-chart(x_data: var[x_field], y_data: var[y_field], x_label: "X Axis", y_label: "Y Axis", colour: "#3b82f6")\`
+
+**Multi-line syntax (for comparing data):**
+\`line-chart(x_data: var[date], x_label: "Date", y_label: "Sessions", title: "Traffic Comparison", lines: [{y_data: oct_traffic[sessions], label: "October", colour: "#3b82f6"}, {y_data: nov_traffic[sessions], label: "November", colour: "#ef4444"}])\`
+
 Returns: Confirmation that chart was displayed
 
-You can use:
-- Original data variables: daily_traffic[date], daily_traffic[sessions]
-- Analysis variables: sorted_sessions, filtered_data
+Examples:
 
-Example:
+Single line:
 \`line-chart(x_data: traffic_data[date], y_data: traffic_data[sessions], x_label: "Date", y_label: "Sessions")\`
+
+Multiple lines (comparing two months):
+\`line-chart(x_data: oct_traffic[date], x_label: "Date", y_label: "Sessions", title: "Oct vs Nov Traffic", lines: [{y_data: oct_traffic[sessions], label: "October", colour: "#3b82f6"}, {y_data: nov_traffic[sessions], label: "November", colour: "#ef4444"}])\`
 
 ### card
 Display a card on the Canvas with content generated by an LLM. Use for summaries and insights.
