@@ -4206,47 +4206,80 @@ BAD (technical/code-like):
 - "line-chart(daily_trend.date, daily_trend.sessions)" ← NO CODE
 
 ================================================================================
-## YOUR TWO OUTPUT OPTIONS
+## YOUR THREE OUTPUT OPTIONS
 ================================================================================
 
 ### OPTION 1: Instruct the Executor
-Give ONE simple, straightforward instruction. The Executor can only do ONE thing at a time.
+Give ONE simple, straightforward instruction IN NATURAL LANGUAGE. The Executor can only do ONE thing at a time.
 
 Format:
-EXECUTOR: <one simple instruction>
+EXECUTOR: <one simple instruction in natural language>
 
-⚠️ CRITICAL RULES:
-1. ONLY ONE STEP per instruction - never combine multiple actions
-2. Follow the DEPENDENCY ORDER - some tools need data from other tools first
-3. Before using a value (like property_id), you MUST first:
-   - Fetch the data that contains it
-   - Extract the specific value using extractor
-4. Keep instructions SIMPLE - describe one action
+⚠️ ALWAYS USE NATURAL LANGUAGE - The Executor translates your words into tool calls!
+✅ CORRECT: "EXECUTOR: Use ga_list_properties to get all available properties."
+✅ CORRECT: "EXECUTOR: Get daily traffic for November 2025 using the extracted property ID."
+❌ WRONG: "EXECUTOR: ga_list_properties()" (no syntax!)
+❌ WRONG: "EXECUTOR: ga_daily_trend_report(property_id=...)" (no syntax!)
 
-CORRECT step-by-step flow (for "Compare October vs November traffic"):
+Tools available via EXECUTOR:
+- Data fetching tools (ga_list_properties, ga_daily_trend_report, etc.)
+- Display tools (table, line-chart, card, alert)
+- display_report (to show analysis reports)
+- add_insight (to add your insights to reports)
+
+### OPTION 2: Instruct the Data Agent
+Give ONE instruction IN NATURAL LANGUAGE for analysis or extraction.
+
+Format:
+DATA: <natural language description>
+
+For Analysis - specify: which variables, what to calculate, where to store
+For Extraction - specify: what to extract, from which variable, where to store
+
+Examples:
+- "DATA: Analyze october_traffic and november_traffic. Calculate total sessions per month and percentage change. Store in traffic_comparison."
+- "DATA: Extract the property_id for 'vibefam' from the properties data. Store in prop_id."
+
+⚠️ Ask ONLY data questions (what, how much, how many) - NOT why questions!
+
+### OPTION 3: Reply to User
+When you have completed the task and displayed results to the user.
+
+Format:
+REPLY: <your response>
+
+================================================================================
+## CORRECT STEP-BY-STEP FLOW
+================================================================================
+
+Example for "Compare October vs November traffic":
 Step 1: EXECUTOR: Use ga_list_properties to get all available properties.
         (wait for result)
-Step 2: EXECUTOR: Use extractor to find the property ID for "vibefam" from the properties.
+Step 2: DATA: Extract the property_id for "vibefam" from the properties data. Store in prop_id.
         (wait for result)
-Step 3: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for October 2025.
-        (wait for result - stored in october_traffic)
-Step 4: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for November 2025.
-        (wait for result - stored in november_traffic)
-Step 5: EXECUTOR: Create a report using october_traffic and november_traffic. Calculate total sessions for each month and percentage change. Store in monthly_totals.
-        (wait - you receive detailed summary: "October: 15,234 sessions, November: 12,890, Change: -15.4%, Peak: Oct 15...")
-Step 6: EXECUTOR: Add insight to monthly_totals with title 'Why Traffic Declined' and insight 'The 15.4% drop in November likely reflects the end of Q3 marketing campaigns. October benefited from back-to-school promotions driving 8 high-traffic days versus only 5 in November.'
+Step 3: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for October 2025. Store in october_traffic.
+        (wait for result)
+Step 4: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for November 2025. Store in november_traffic.
+        (wait for result)
+Step 5: DATA: Analyze october_traffic and november_traffic. Calculate total sessions for each month, percentage change, and top 5 days by sessions. Store in traffic_comparison.
+        (wait - you receive detailed summary with all calculated values)
+Step 6: EXECUTOR: Add insight to traffic_comparison with title 'Why Traffic Declined' and insight 'The 15.4% drop in November likely reflects the end of Q3 marketing campaigns...'
         (wait - insight added)
-Step 7: EXECUTOR: Display the monthly_totals report to the user.
-        (wait - report with your insight is displayed)
+Step 7: EXECUTOR: Display the traffic_comparison report to the user.
+        (wait - report displayed)
 Step 8: REPLY: Explain what's shown including your insight about the traffic decline.
 
-WRONG - asking the tool to generate insights:
-❌ EXECUTOR: Create a report and explain why the traffic changed (YOU explain it!)
-❌ EXECUTOR: Analyze and provide insights (YOU provide insights using add_insight!)
+WRONG:
+❌ EXECUTOR: ga_list_properties() (use natural language, not syntax!)
+❌ EXECUTOR: ga_daily_trend_report(property_id=...) (use natural language!)
+❌ EXECUTOR: Analyze the traffic data (use DATA: for analysis!)
+❌ DATA: Why did traffic decline? (YOU interpret the numbers!)
 
 Each instruction = ONE action. Wait for the result before the next step.
 
-### OPTION 2: Reply to User
+================================================================================
+## REPLY GUIDELINES
+================================================================================
 When you have completed the task and displayed results to the user.
 
 Format:
@@ -4302,94 +4335,74 @@ BAD variable names:
 ## AVAILABLE TOOLS
 ================================================================================
 
-Tell the Executor which tool to use in natural language.
-
-### Data Tools
+### Data Tools (use via EXECUTOR:)
 ${toolSummaries}
-### Processing Tools
-• report - Creates a SINGLE FOCUSED analysis report from DATA stored in VARIABLES
-  - ONLY use when you have data variables to analyze
-  - It performs: sum, average, max, min, count, compare, percentages, filter, sort
-  - It creates a REPORT (stored in a variable) and a DETAILED SUMMARY (shown to you)
-  - The SUMMARY contains ALL calculated values so YOU can formulate insights
-
-  ⚠️ CRITICAL - BREAK DOWN INTO MULTIPLE REPORTS:
-  - Create ONE report for ONE specific aspect of the analysis
-  - Review the SUMMARY you receive - it contains all the data
-  - Add YOUR insights using add_insight (see below)
-  - Then display the report
+### DATA Agent Tools (use via DATA:)
+• Analysis - Analyzes data in variables, calculates totals, averages, comparisons
+  - Returns a DETAILED SUMMARY with all calculated values
+  - Creates a report variable you can display later
+  - Use DATA: with "analyze" keyword
   
-  Example breakdown for "Compare Q3 vs Q4 sales":
-  1. Create revenue_comparison report → review summary → add insight → display
-  2. Create top_products report → review summary → add insight → display
+• Extraction - Extracts specific values from variables
+  - Finds specific items (like an ID from a list)
+  - Stores the extracted value in a new variable
+  - Use DATA: with "extract" keyword
 
-  ⚠️ WHEN CALLING report, YOU MUST SPECIFY:
-  1. Which variables to use (by name)
-  2. What SINGLE aspect to analyze (not everything at once)
-  3. What calculations to perform
-  
-  ✅ CORRECT: "Create a report using q3_sales and q4_sales. Calculate total revenue per quarter and percentage change. Store in revenue_comparison."
-  ❌ WRONG: "Create a report with insights about why revenue changed" (YOU add insights after!)
-
+### Display Tools (use via EXECUTOR:)
 • add_insight - Add YOUR interpretation/insight to a report AFTER you see the summary
   - YOU provide the insight text based on the summary data you received
   - Specify: report variable, title, and your insight text
-  - Example: "Add insight to revenue_comparison with title 'Why Revenue Dropped' and insight 'The 15% decline in Q4 coincides with the end of summer promotions. Q3 benefited from back-to-school campaigns.'"
+  - Example: "EXECUTOR: Add insight to traffic_comparison with title 'Why Traffic Declined' and insight '...'"
   
   ⚠️ YOU must write the insight - don't ask the tool to generate it!
-
-• extractor - Extract specific values from data into a variable
-  - Use for finding specific items (like an ID from a list)
-  - You DON'T see the value, just confirmation it's stored
 
 • display_report - Display an analysis report to the user
   - Takes a report variable and shows it on canvas
   - Call AFTER adding your insights
-  - Example: "Display the revenue_comparison report to the user"
+  - Example: "EXECUTOR: Display the traffic_comparison report to the user"
 
-### Manual Display Tools (only if needed separately)
 • table - Display data as a table
 • line-chart - Display data as a line chart  
 • card - Display markdown content
 • alert - Display an important notice
 
-⚠️ IMPORTANT WORKFLOW - CREATE, ADD INSIGHT, THEN DISPLAY:
-1. Create a FOCUSED report (calculations only) → stored in variable, you see DETAILED SUMMARY
-2. Review the summary - it has all the numbers you need
-3. Add YOUR insight using add_insight → "Add insight to <variable> with title '...' and insight '...'"
-4. Display the report → "Display the <variable> to the user"
-5. Repeat for the next aspect of the analysis
-6. After ALL reports are displayed → REPLY to user
+⚠️ IMPORTANT WORKFLOW:
+1. DATA: Analyze variables (calculations only) → you receive DETAILED SUMMARY with all values
+2. Review the summary - use the numbers to formulate YOUR insight
+3. EXECUTOR: Add YOUR insight → "Add insight to <variable> with title '...' and insight '...'"
+4. EXECUTOR: Display the report → "Display the <variable> to the user"
+5. Repeat for additional analyses
+6. REPLY: Explain to user what's displayed
 
 ================================================================================
 ## ⚠️ STEP-BY-STEP EXECUTION RULES
 ================================================================================
 
 1. ONE instruction per turn - never combine multiple steps
-2. Check tool dependencies in AVAILABLE TOOLS:
-   - If a tool says "Requires: X first", you MUST call X first
-   - You MUST have the data before you can extract from it
-   - You MUST extract a value before using it in another tool
-3. Wait for Executor's report before deciding the next step
+2. Use the right prefix:
+   - EXECUTOR: for data fetching and display
+   - DATA: for analysis and extraction
+   - REPLY: to respond to user
+3. Wait for the agent's report before deciding the next step
 4. Think: "What is the ONE thing I need to do next?"
 
 TYPICAL FLOW:
-1. Fetch data (ga_list_properties, etc.)
-2. Extract specific value if needed (extractor)
-3. Use extracted value in next tool (e.g., get report with property_id)
-4. Create FIRST focused report (calculations only)
+1. EXECUTOR: Fetch data (ga_list_properties, etc.)
+2. DATA: Extract specific value if needed
+3. EXECUTOR: Use extracted value in next tool
+4. DATA: Analyze variables (calculations only)
 5. Review the detailed summary you receive
-6. Add YOUR insight using add_insight
-7. Display the report
+6. EXECUTOR: Add YOUR insight using add_insight
+7. EXECUTOR: Display the report
 8. (Repeat 4-7 for each aspect of analysis)
-9. Reply to user explaining what's displayed
+9. REPLY: Explain what's displayed
 
 Example for "Compare Q3 vs Q4 sales":
-- Step 4: Create revenue_comparison report 
-- Step 5: (see summary with all numbers)
-- Step 6: Add insight "The 20% revenue increase in Q4 is driven by holiday shopping..."
-- Step 7: Display revenue_comparison
-- Step 8: REPLY summarizing the analysis with your insights
+- Step 4: DATA: Analyze q3_sales and q4_sales. Calculate totals and percentage change. Store in revenue_comparison.
+- Step 5: (see summary: "Q3: $45K, Q4: $54K, Change: +20%")
+- Step 6: EXECUTOR: Add insight to revenue_comparison with title "Why Q4 Outperformed" and insight "The 20% increase is driven by holiday shopping..."
+- Step 7: EXECUTOR: Display revenue_comparison
+- Step 8: REPLY: I've analyzed your Q3 vs Q4 sales...
 
 ================================================================================
 ## GUIDELINES
@@ -4397,29 +4410,30 @@ Example for "Compare Q3 vs Q4 sales":
 
 1. Speak in natural language only - no code, no brackets, no syntax
 2. ONE STEP at a time - simple, straightforward instructions
-3. Reference variables by name - Executor handles the technical details
-4. Follow tool dependencies - fetch → extract → use → display
+3. Use the right prefix: EXECUTOR for fetching/display, DATA for analysis/extraction
+4. Reference variables by name - agents handle the technical details
 5. Display tools show on Canvas - don't recreate in REPLY
 6. Your REPLY explains and describes - never fabricates data
 
 ================================================================================
-## ❌ DO NOT USE report FOR THESE
+## ❌ DO NOT USE DATA: FOR THESE
 ================================================================================
 
-The report tool is STRICTLY for analyzing DATA stored in VARIABLES.
+DATA: is STRICTLY for analyzing or extracting from DATA stored in VARIABLES.
 
-DO NOT use report for:
+DO NOT use DATA: for:
 - Date ranges or date formatting (you know how dates work)
 - Simple calculations or conversions
 - General knowledge questions
 - Anything that doesn't involve analyzing fetched data variables
+- Asking "why" questions (YOU interpret the numbers!)
 
-ONLY use report when you have actual data variables to analyze!
+ONLY use DATA: when you have actual data variables to analyze or extract from!
 
 ================================================================================
 
 Based on the user's request and available data, what is your NEXT SINGLE STEP?
-Output either EXECUTOR: <one instruction> or REPLY: <message>`;
+Output EXECUTOR: <instruction>, DATA: <instruction>, or REPLY: <message>`;
 }
 
 // Extract tools mentioned in Pilot's instruction
@@ -4436,10 +4450,8 @@ function extractMentionedTools(instruction: string): string[] {
     }
   }
   
-  // Also check for built-in tools
-  if (instructionLower.includes('report') || instructionLower.includes('create a report') || instructionLower.includes('analyz')) mentioned.push('report');
+  // Also check for built-in tools (report and extractor are handled by DATA AGENT, not Executor)
   if (instructionLower.includes('add_insight') || instructionLower.includes('add insight') || instructionLower.includes('add an insight')) mentioned.push('add_insight');
-  if (instructionLower.includes('extractor') || instructionLower.includes('extract')) mentioned.push('extractor');
   if (instructionLower.includes('display_report') || instructionLower.includes('display') && instructionLower.includes('report')) mentioned.push('display_report');
   if (instructionLower.includes('table')) mentioned.push('table');
   if (instructionLower.includes('line-chart') || instructionLower.includes('chart')) mentioned.push('line-chart');
@@ -9452,6 +9464,466 @@ async function runQueryOrchestrator(
   }
 }
 
+// Clean Pilot output - handle tag conflicts (keep first tag only)
+function cleanPilotOutput(rawOutput: string): { tag: 'EXECUTOR' | 'DATA' | 'REPLY' | null; content: string; wasCleaned: boolean } {
+  const tags = ['EXECUTOR:', 'DATA:', 'REPLY:'];
+  const upperOutput = rawOutput.toUpperCase();
+  
+  // Find first tag and its position
+  let firstTagIndex = -1;
+  let firstTag = '';
+  for (const tag of tags) {
+    const idx = upperOutput.indexOf(tag);
+    if (idx !== -1 && (firstTagIndex === -1 || idx < firstTagIndex)) {
+      firstTagIndex = idx;
+      firstTag = tag;
+    }
+  }
+  
+  if (firstTagIndex === -1) {
+    return { tag: null, content: rawOutput.trim(), wasCleaned: false };
+  }
+  
+  // Find second tag (any tag after the first)
+  let secondTagIndex = rawOutput.length;
+  for (const tag of tags) {
+    const idx = upperOutput.indexOf(tag, firstTagIndex + firstTag.length);
+    if (idx !== -1 && idx < secondTagIndex) {
+      secondTagIndex = idx;
+    }
+  }
+  
+  // Extract content between first tag and second tag
+  const contentStart = firstTagIndex + firstTag.length;
+  const content = rawOutput.slice(contentStart, secondTagIndex).trim();
+  const wasCleaned = secondTagIndex < rawOutput.length;
+  
+  const tagName = firstTag.replace(':', '') as 'EXECUTOR' | 'DATA' | 'REPLY';
+  
+  if (wasCleaned) {
+    console.log(`[Pilot] Tag conflict detected - cleaned output. Kept: ${tagName}, removed content after position ${secondTagIndex}`);
+  }
+  
+  return { tag: tagName, content, wasCleaned };
+}
+
+// ================================================================================
+// DATA AGENT - Handles analysis (report) and extraction (extractor) tools
+// ================================================================================
+
+// Build the Data Agent's system prompt (similar to Executor)
+function buildDataAgentPrompt(
+  task: string,
+  variablesContext: string
+): string {
+  return `# DATA AGENT
+
+You translate the Pilot's natural language instructions into actual tool calls for data analysis and extraction.
+
+================================================================================
+## TASK FROM PILOT (Natural Language)
+================================================================================
+
+${task}
+
+================================================================================
+## YOUR JOB
+================================================================================
+
+1. Understand what the Pilot wants (they speak in natural language)
+2. Translate it into the proper tool call syntax
+3. Figure out which variables to use and how to access them
+4. Execute ONE tool call (either report or extractor)
+
+The Pilot says things like:
+- "Extract the property ID for vibefam from the properties data. Store in prop_id." → You write: prop_id: extractor(data: [properties[display_name], properties[property_id]], extract: "find the property_id for vibefam")
+- "Analyze october_traffic and november_traffic. Calculate total sessions per month. Store in traffic_comparison." → You write: traffic_comparison: report(data: [october_traffic, november_traffic], question: "Calculate total sessions per month and percentage change")
+
+================================================================================
+## TOOL DOCUMENTATION
+================================================================================
+
+### report (Data Analysis)
+Creates analysis reports from data variables.
+
+Syntax:
+\`variable_name: report(data: [var1, var2, ...], question: "what to analyze")\`
+
+Example:
+\`traffic_comparison: report(data: [october_traffic, november_traffic], question: "Calculate total sessions for each month and percentage change")\`
+
+The report tool can: sum, average, max, min, count, compare, percentages, filter, sort, correlations.
+
+### extractor (Value Extraction)
+Extracts specific values from data variables.
+
+Syntax:
+\`variable_name: extractor(data: [var[field1], var[field2], ...], extract: "what to extract")\`
+
+Example:
+\`vibefam_prop_id: extractor(data: [properties[display_name], properties[property_id]], extract: "find the property_id where display_name contains vibefam")\`
+
+================================================================================
+## EXISTING VARIABLES (Use these!)
+================================================================================
+
+${variablesContext || '(No variables yet)'}
+
+================================================================================
+## SYNTAX REFERENCE
+================================================================================
+
+Store result in variable:
+\`variable_name: tool_name(arg: value, arg2: value2)\`
+
+Access variable data:
+\`variable_name[field_name]\`
+
+For report (use natural language for question):
+\`result: report(data: [var1, var2], question: "natural language description of analysis")\`
+
+For extractor (use natural language for extract):
+\`result: extractor(data: [var[field1], var[field2]], extract: "natural language description of what to extract")\`
+
+================================================================================
+## YOUR OUTPUT
+================================================================================
+
+Write ONE tool call that accomplishes what the Pilot asked.
+Then write DONE: with a brief summary.
+
+Format:
+<tool call>
+DONE: <what was accomplished>
+
+================================================================================
+
+Now write the tool call for this task:`;
+}
+
+async function runDataAgent(
+  instructions: string,
+  variables: Map<string, PilotVariable>,
+  generatedDSL: string[],
+  model: string,
+  sendEvent: (data: any) => void
+): Promise<{ success: boolean; report: string; newVariables: string[] }> {
+  const client = createOpenRouterClient();
+  const newVariables: string[] = [];
+  
+  console.log(`\n${'═'.repeat(80)}`);
+  console.log(`📊 DATA AGENT`);
+  console.log(`${'═'.repeat(80)}`);
+  console.log(`Instructions: ${instructions}`);
+  
+  // Build variables context with descriptions
+  let variablesContext = '';
+  if (variables.size > 0) {
+    variablesContext = `⚠️ These ${variables.size} variable(s) ALREADY EXIST - use them!\n\n`;
+    for (const [name, variable] of variables) {
+      const accessKeys = Object.keys(variable.schema)
+        .map(key => `${name}[${key}]`)
+        .join(', ');
+      variablesContext += `📦 ${name}\n`;
+      variablesContext += `   Description: ${variable.description}\n`;
+      variablesContext += `   Access via: ${accessKeys}\n\n`;
+    }
+  }
+  
+  sendEvent({
+    type: 'data_agent_started',
+    task: instructions.slice(0, 200),
+    tools: ['report', 'extractor']
+  });
+  
+  const systemPrompt = buildDataAgentPrompt(instructions, variablesContext);
+  
+  const messages: any[] = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: 'Execute this step now. Write ONE tool call then DONE with summary.' }
+  ];
+  
+  sendEvent({
+    type: 'data_agent_thinking',
+    iteration: 1,
+    progress: 0
+  });
+  
+  try {
+    // Use retry wrapper for Data Agent
+    const response = await retryLLMCall(
+      () => client.chat.completions.create({
+        model,
+        messages,
+        temperature: 0.3
+      }),
+      (res) => res.choices[0]?.message?.content || '',
+      'Data Agent'
+    );
+    
+    const dataAgentResponse = response.choices[0]?.message?.content || '';
+    
+    sendEvent({
+      type: 'data_agent_step',
+      iteration: 1,
+      response: dataAgentResponse
+    });
+    
+    // Parse tool call from response
+    console.log(`\n[Data Agent] Parsing tool calls from response...`);
+    console.log(`[Data Agent] Response: ${dataAgentResponse}`);
+    
+    const toolCalls = parseToolCalls(dataAgentResponse);
+    
+    console.log(`[Data Agent] Parsed ${toolCalls.length} tool call(s)`);
+    
+    if (toolCalls.length === 0) {
+      // Maybe Data Agent just said DONE without a tool call
+      const doneMatch = dataAgentResponse.match(/DONE:\s*(.+)/is);
+      if (doneMatch) {
+        console.log(`[Data Agent] No tool call found, but found DONE - returning report`);
+        return { success: true, report: doneMatch[1].trim(), newVariables };
+      }
+      console.log(`[Data Agent] ERROR: No tool call and no DONE found`);
+      sendEvent({ type: 'data_agent_error', error: 'Could not parse tool call from response' });
+      return { success: false, report: 'Could not parse tool call from Data Agent response', newVariables };
+    }
+    
+    const call = toolCalls[0];
+    let report = '';
+    
+    sendEvent({
+      type: 'data_agent_calling_tool',
+      tool: call.toolName,
+      variable: call.variableName,
+      raw: call.raw
+    });
+    
+    // ========================================================================
+    // Execute the tool
+    // ========================================================================
+    
+    if (call.toolName === 'report') {
+      // Report tool - Data Analysis
+      console.log(`\n[Data Agent] Executing REPORT tool`);
+      console.log(`[Data Agent] Variable name: ${call.variableName}`);
+      console.log(`[Data Agent] Args: ${JSON.stringify(call.args)}`);
+      
+      // Parse the data and question from args
+      let dataStr = '';
+      let questionStr = '';
+      
+      if (typeof call.args === 'string') {
+        const dataMatch = call.args.match(/data:\s*\[([^\]]+)\]/);
+        if (dataMatch) dataStr = dataMatch[1];
+        const questionMatch = call.args.match(/question:\s*["']([^"']+)["']/);
+        if (questionMatch) questionStr = questionMatch[1];
+      } else if (typeof call.args === 'object') {
+        dataStr = String(call.args.data || '');
+        questionStr = call.args.question || '';
+      }
+      
+      // Extract variable references
+      const parsedRefs: string[] = [];
+      const refMatches = dataStr.matchAll(/([a-zA-Z_][a-zA-Z0-9_]*(?:\[[a-zA-Z_][a-zA-Z0-9_]*\])?)/g);
+      for (const match of refMatches) {
+        if (match[1].includes('[') || variables.has(match[1])) {
+          parsedRefs.push(match[1]);
+        }
+      }
+      
+      console.log(`[Data Agent] Data refs: ${parsedRefs.join(', ')}`);
+      console.log(`[Data Agent] Question: ${questionStr}`);
+      
+      sendEvent({
+        type: 'data_agent_tool_calling',
+        tool: 'report',
+        dataRefs: parsedRefs,
+        question: questionStr
+      });
+      
+      // Call the Data Analysis system
+      const analysisResult = await runDataAnalysis(
+        parsedRefs,
+        questionStr || instructions,
+        variables,
+        model,
+        sendEvent
+      );
+      
+      if (analysisResult.error) {
+        console.log(`\n❌ ANALYSIS ERROR: ${analysisResult.error}`);
+        sendEvent({ type: 'data_agent_tool_error', tool: 'report', error: analysisResult.error });
+        return { success: false, report: `Analysis failed: ${analysisResult.error}`, newVariables };
+      }
+      
+      // Store the report in the variable
+      const variableName = call.variableName || 'analysis_report';
+      variables.set(variableName, {
+        name: variableName,
+        schema: {
+          report: { description: 'Full analysis report with display instructions', data_type: 'string' },
+          summary: { description: 'Detailed summary of findings', data_type: 'string' }
+        },
+        actualData: {
+          report: analysisResult.report,
+          summary: analysisResult.summary
+        },
+        description: `Analysis report: ${analysisResult.summary.slice(0, 100)}...`
+      });
+      newVariables.push(variableName);
+      
+      console.log(`\n✅ ANALYSIS STORED IN: ${variableName}`);
+      
+      sendEvent({
+        type: 'data_agent_tool_success',
+        tool: 'report',
+        variable: variableName,
+        schemaKeys: ['report', 'summary'],
+        result: `Stored in '${variableName}'. Available: ${variableName}[report], ${variableName}[summary]`
+      });
+      
+      report = `Data Analysis complete. Stored in '${variableName}'. Summary: ${analysisResult.summary}`;
+    }
+    
+    else if (call.toolName === 'extractor') {
+      // Extractor tool
+      console.log(`\n[Data Agent] Executing EXTRACTOR tool`);
+      console.log(`[Data Agent] Variable name: ${call.variableName}`);
+      console.log(`[Data Agent] Args: ${JSON.stringify(call.args)}`);
+      
+      // Parse the data and extract from args
+      let dataStr = '';
+      let extractStr = '';
+      
+      if (typeof call.args === 'string') {
+        const dataMatch = call.args.match(/data:\s*\[([^\]]+)\]/);
+        if (dataMatch) dataStr = dataMatch[1];
+        const extractMatch = call.args.match(/extract:\s*["']([^"']+)["']/);
+        if (extractMatch) extractStr = extractMatch[1];
+      } else if (typeof call.args === 'object') {
+        dataStr = String(call.args.data || '');
+        extractStr = call.args.extract || '';
+      }
+      
+      // Find source variables
+      const sourceVars: string[] = [];
+      for (const [varName] of variables) {
+        if (dataStr.includes(varName)) {
+          sourceVars.push(varName);
+        }
+      }
+      
+      console.log(`[Data Agent] Source vars: ${sourceVars.join(', ')}`);
+      console.log(`[Data Agent] Extract: ${extractStr}`);
+      
+      sendEvent({
+        type: 'data_agent_tool_calling',
+        tool: 'extractor',
+        sourceVars,
+        extract: extractStr
+      });
+      
+      // Build context with actual data
+      let dataContext = '';
+      for (const varName of sourceVars) {
+        const varData = variables.get(varName);
+        if (varData && varData.actualData) {
+          const preview = JSON.stringify(varData.actualData, null, 2).slice(0, 2000);
+          dataContext += `\nVariable "${varName}":\n${preview}\n`;
+        }
+      }
+      
+      const extractPrompt = `Extract the requested value from the data.
+
+DATA:
+${dataContext}
+
+REQUEST: ${extractStr || instructions}
+
+Return ONLY a JSON object with the extracted value. Format: {"value": <extracted_value>}
+If extracting multiple fields, return: {"field1": value1, "field2": value2, ...}`;
+
+      const extractResponse = await retryLLMCall(
+        () => client.chat.completions.create({
+          model,
+          messages: [{ role: 'user', content: extractPrompt }],
+          temperature: 0.1
+        }),
+        (res) => res.choices[0]?.message?.content || '',
+        'Data Agent Extractor'
+      );
+      
+      const extractResult = extractResponse.choices[0]?.message?.content || '';
+      
+      // Parse the extracted value
+      let extracted: any = null;
+      try {
+        const jsonMatch = extractResult.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          extracted = JSON.parse(jsonMatch[0]);
+        }
+      } catch {
+        extracted = { value: extractResult.trim() };
+      }
+      
+      if (extracted) {
+        // Store in variable
+        let schema: Record<string, any> = {};
+        let actualData: any;
+        
+        if (typeof extracted === 'object' && !Array.isArray(extracted)) {
+          for (const key of Object.keys(extracted)) {
+            schema[key] = { description: `Extracted field: ${key}`, data_type: typeof extracted[key] };
+          }
+          actualData = extracted;
+        } else {
+          schema = { value: { description: 'Extracted value', data_type: typeof extracted } };
+          actualData = { value: extracted };
+        }
+        
+        const variableName = call.variableName || 'extracted_value';
+        variables.set(variableName, {
+          name: variableName,
+          schema,
+          actualData,
+          description: `Extracted value`
+        });
+        newVariables.push(variableName);
+        
+        console.log(`\n✅ EXTRACTED AND STORED IN: ${variableName}`);
+        
+        sendEvent({
+          type: 'data_agent_tool_success',
+          tool: 'extractor',
+          variable: variableName,
+          schemaKeys: Object.keys(schema),
+          result: `Stored in '${variableName}'. Available: ${Object.keys(schema).map(k => `${variableName}[${k}]`).join(', ')}`
+        });
+        
+        report = `Extracted and stored in '${variableName}'. You can use ${variableName}[value] in subsequent operations.`;
+      } else {
+        sendEvent({ type: 'data_agent_tool_error', tool: 'extractor', error: 'Could not extract value' });
+        return { success: false, report: 'Could not extract the requested value from the data', newVariables };
+      }
+    }
+    
+    else {
+      // Unknown tool
+      console.log(`[Data Agent] ERROR: Unknown tool ${call.toolName}`);
+      sendEvent({ type: 'data_agent_error', error: `Unknown tool: ${call.toolName}` });
+      return { success: false, report: `Unknown tool: ${call.toolName}. Use 'report' for analysis or 'extractor' for extraction.`, newVariables };
+    }
+    
+    return { success: true, report, newVariables };
+    
+  } catch (error: any) {
+    console.log(`\n❌ DATA AGENT ERROR: ${error.message}`);
+    sendEvent({ type: 'data_agent_error', error: error.message });
+    return { success: false, report: `Data Agent error: ${error.message}`, newVariables };
+  }
+}
+
 // Run the Pilot agent for one turn
 async function runPilotAgent(
   userMessage: string,
@@ -9460,7 +9932,7 @@ async function runPilotAgent(
   pilotHistory: Array<{ role: string; content: string }>,
   model: string,
   sendEvent: (data: any) => void
-): Promise<{ action: 'EXECUTOR' | 'REPLY'; content: string }> {
+): Promise<{ action: 'EXECUTOR' | 'DATA' | 'REPLY'; content: string }> {
   const client = createOpenRouterClient();
   
   const toolSummaries = buildToolSummariesForPilot();
@@ -9470,9 +9942,9 @@ async function runPilotAgent(
   // Build user message for this turn
   let userContent = '';
   if (executorReport) {
-    userContent = `EXECUTOR REPORT:\n${executorReport}\n\nBased on this result, what is your NEXT SINGLE STEP?\n\nRemember: Give ONE instruction at a time. Think about what you learned and what you need next.\n\n(EXECUTOR: single step instruction OR REPLY: final response to user)`;
+    userContent = `AGENT REPORT:\n${executorReport}\n\nBased on this result, what is your NEXT SINGLE STEP?\n\nRemember: Give ONE instruction at a time. Think about what you learned and what you need next.\n\n(EXECUTOR: for data fetching/display OR DATA: for analysis/extraction OR REPLY: final response)`;
   } else {
-    userContent = `USER REQUEST:\n${userMessage}\n\nWhat is your FIRST STEP to address this request?\n\nRemember: Give ONE instruction at a time. You'll see the results before deciding the next step.\n\n(EXECUTOR: single step instruction OR REPLY: if you can answer directly)`;
+    userContent = `USER REQUEST:\n${userMessage}\n\nWhat is your FIRST STEP to address this request?\n\nRemember: Give ONE instruction at a time. You'll see the results before deciding the next step.\n\n(EXECUTOR: for data fetching/display OR DATA: for analysis/extraction OR REPLY: if you can answer directly)`;
   }
   
   // Add to history
@@ -9508,36 +9980,49 @@ async function runPilotAgent(
       'Pilot Agent'
     );
     
-    const pilotResponse = response.choices[0]?.message?.content || '';
+    const rawPilotResponse = response.choices[0]?.message?.content || '';
     
-    // Add to history
+    // Clean the response - handle tag conflicts (keep first tag only)
+    const { tag, content: cleanedContent, wasCleaned } = cleanPilotOutput(rawPilotResponse);
+    
+    // Use cleaned response for history and events
+    const pilotResponse = tag ? `${tag}: ${cleanedContent}` : rawPilotResponse;
+    
+    // Add cleaned response to history
     pilotHistory.push({ role: 'assistant', content: pilotResponse });
     
     sendEvent({
       type: 'pilot_response',
-      response: pilotResponse
+      response: pilotResponse,
+      wasCleaned,
+      originalLength: rawPilotResponse.length,
+      cleanedLength: pilotResponse.length
     });
     
-    // Parse Pilot's output
-    if (pilotResponse.toUpperCase().includes('EXECUTOR:')) {
-      const match = pilotResponse.match(/EXECUTOR:\s*(.+)/is);
-      const instructions = match ? match[1].trim() : pilotResponse;
-      return { action: 'EXECUTOR', content: instructions };
+    // Route based on detected tag
+    if (tag === 'EXECUTOR') {
+      return { action: 'EXECUTOR', content: cleanedContent };
     }
-    else if (pilotResponse.toUpperCase().includes('REPLY:')) {
-      const match = pilotResponse.match(/REPLY:\s*(.+)/is);
-      const message = match ? match[1].trim() : pilotResponse;
-      return { action: 'REPLY', content: message };
+    else if (tag === 'DATA') {
+      return { action: 'DATA', content: cleanedContent };
+    }
+    else if (tag === 'REPLY') {
+      return { action: 'REPLY', content: cleanedContent };
     }
     else {
-      // Default: treat as executor instruction if contains tool names, otherwise as reply
+      // No tag found - default behavior: check for tool names
       const hasToolNames = getAllSubTools().some(st => 
-        pilotResponse.toLowerCase().includes(st.id.toLowerCase())
+        rawPilotResponse.toLowerCase().includes(st.id.toLowerCase())
       );
       if (hasToolNames) {
-        return { action: 'EXECUTOR', content: pilotResponse };
+        return { action: 'EXECUTOR', content: rawPilotResponse };
       }
-      return { action: 'REPLY', content: pilotResponse };
+      // Check for analysis keywords
+      if (rawPilotResponse.toLowerCase().includes('analyze') || 
+          rawPilotResponse.toLowerCase().includes('extract')) {
+        return { action: 'DATA', content: rawPilotResponse };
+      }
+      return { action: 'REPLY', content: rawPilotResponse };
     }
     
   } catch (error: any) {
@@ -9555,7 +10040,8 @@ async function runPilotSystem(
   userMessage: string,
   model: string,
   conversationHistory: Array<{ role: string; content: string }>,
-  sendEvent: (data: any) => void
+  sendEvent: (data: any) => void,
+  useOrchestrator: boolean = true
 ): Promise<{ finalDSL: string[]; finalMessage: string; history: Array<{ role: string; content: string }> }> {
   // If this is a new conversation (no history), reset variables
   if (conversationHistory.length === 0) {
@@ -9570,20 +10056,28 @@ async function runPilotSystem(
   const pilotHistory: Array<{ role: string; content: string }> = [...conversationHistory];
   
   // ========================================================================
-  // QUERY ORCHESTRATOR - Analyze request and create task plan
+  // QUERY ORCHESTRATOR - Analyze request and create task plan (if enabled)
   // ========================================================================
-  sendEvent({ type: 'orchestrator_starting' });
+  let enrichedMessage: string;
   
-  const orchestratedPlan = await runQueryOrchestrator(userMessage, model, sendEvent);
-  
-  // Combine original user message with orchestrated plan for the Pilot
-  const enrichedMessage = `## ORIGINAL USER REQUEST
+  if (useOrchestrator) {
+    sendEvent({ type: 'orchestrator_starting' });
+    
+    const orchestratedPlan = await runQueryOrchestrator(userMessage, model, sendEvent);
+    
+    // Combine original user message with orchestrated plan for the Pilot
+    enrichedMessage = `## ORIGINAL USER REQUEST
 ${userMessage}
 
 ## TASK PLAN (from Query Orchestrator)
 ${orchestratedPlan}
 
 Follow the task plan above, executing ONE step at a time.`;
+  } else {
+    sendEvent({ type: 'orchestrator_skipped' });
+    // Send user message directly to Pilot without orchestration
+    enrichedMessage = userMessage;
+  }
   
   // ========================================================================
   
@@ -9664,6 +10158,31 @@ Follow the task plan above, executing ONE step at a time.`;
       }
       executorReport = reportParts.join('\n');
     }
+    else if (pilotResult.action === 'DATA') {
+      // Pilot wants Data Agent to analyze or extract
+      const instructions = pilotResult.content;
+      
+      sendEvent({
+        type: 'pilot_instructing_data_agent',
+        instructions: instructions.slice(0, 300)
+      });
+      
+      // Run Data Agent
+      const dataResult = await runDataAgent(
+        instructions,
+        variables,
+        generatedDSL,
+        model,
+        sendEvent
+      );
+      
+      // Prepare report for next Pilot turn
+      let reportParts = [dataResult.report];
+      if (dataResult.newVariables.length > 0) {
+        reportParts.push(`Created variables: ${dataResult.newVariables.join(', ')}`);
+      }
+      executorReport = reportParts.join('\n');
+    }
   }
   
   if (!isComplete) {
@@ -9694,7 +10213,7 @@ Follow the task plan above, executing ONE step at a time.`;
 
 // Pilot System endpoint (replaces tool-calling agent)
 app.post('/api/tool-calling-agent', async (req, res) => {
-  const { message, history = [], model: modelId = 'gpt-oss-20b' } = req.body;
+  const { message, history = [], model: modelId = 'gpt-oss-20b', useOrchestrator = true } = req.body;
   
   if (!message) {
     res.status(400).json({ error: 'Message required' });
@@ -9721,13 +10240,14 @@ app.post('/api/tool-calling-agent', async (req, res) => {
   };
   
   try {
-    sendEvent({ type: 'started', model, modelId, system: 'pilot' });
+    sendEvent({ type: 'started', model, modelId, system: 'pilot', useOrchestrator });
     
     const result = await runPilotSystem(
       message,
       model,
       history,
-      sendEvent
+      sendEvent,
+      useOrchestrator
     );
     
     // Send final result

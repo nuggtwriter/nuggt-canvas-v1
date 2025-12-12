@@ -128,13 +128,14 @@ export const generateWithToolCallingAgent = async (
   history: { role: string; content: string }[],
   model: string,
   onProgress?: ProgressCallback,
-  onEvent?: ToolCallingCallback
+  onEvent?: ToolCallingCallback,
+  useOrchestrator: boolean = true
 ): Promise<{ dsl: string[]; message: string; history: { role: string; content: string }[] }> => {
   try {
     const response = await fetch('/api/tool-calling-agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, history, model })
+      body: JSON.stringify({ message, history, model, useOrchestrator })
     });
 
     if (!response.ok) {

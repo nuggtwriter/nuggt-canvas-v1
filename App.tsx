@@ -644,6 +644,7 @@ export default function App({ onNavigateToLearn }: { onNavigateToLearn?: () => v
   const [selectedModel, setSelectedModel] = useState<ModelId>('claude-opus-4.5');
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [toolCallingMode, setToolCallingMode] = useState(false); // For OpenRouter Pilot System
+  const [useOrchestrator, setUseOrchestrator] = useState(true); // Enable/disable Query Orchestrator
   
   // Developer mode state
   const [devMode, setDevMode] = useState(false);
@@ -1020,7 +1021,8 @@ If the user is asking for something new, just output the new components.
           },
           (event: ToolCallingEvent) => {
             setToolCallingEvents(prev => [...prev, event]);
-          }
+          },
+          useOrchestrator
         );
         
         // Combine DSL and message
@@ -1979,20 +1981,38 @@ Example:
             {/* Tool-Calling Mode Toggle - always visible on hero */}
             {selectedModel === 'gpt-oss-20b' && (
               <div 
-                className="flex items-center justify-center gap-3 mt-6"
+                className="flex flex-col items-center justify-center gap-3 mt-6"
                 onClick={(e) => e.stopPropagation()}
               >
-                <span className="text-sm text-slate-500">Mode:</span>
-                <button
-                  onClick={() => setToolCallingMode(!toolCallingMode)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition shadow-sm ${
-                    toolCallingMode 
-                      ? 'bg-emerald-500 text-white ring-2 ring-emerald-300 shadow-emerald-200' 
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {toolCallingMode ? '🚀 Pilot System ON' : '🚀 Enable Pilot System'}
-                </button>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-slate-500">Mode:</span>
+                  <button
+                    onClick={() => setToolCallingMode(!toolCallingMode)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition shadow-sm ${
+                      toolCallingMode 
+                        ? 'bg-emerald-500 text-white ring-2 ring-emerald-300 shadow-emerald-200' 
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {toolCallingMode ? '🚀 Pilot System ON' : '🚀 Enable Pilot System'}
+                  </button>
+                </div>
+                {/* Orchestrator Toggle - only visible when Pilot System is ON */}
+                {toolCallingMode && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-slate-500">Orchestrator:</span>
+                    <button
+                      onClick={() => setUseOrchestrator(!useOrchestrator)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition shadow-sm ${
+                        useOrchestrator 
+                          ? 'bg-indigo-500 text-white ring-2 ring-indigo-300 shadow-indigo-200' 
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {useOrchestrator ? '🎯 Orchestrator ON' : '🎯 Orchestrator OFF'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
         </div>
@@ -2413,17 +2433,33 @@ Example:
 
                   {/* Tool-Calling Mode Toggle (only for OpenRouter) */}
                   {selectedModel === 'gpt-oss-20b' && (
-                    <button
-                      onClick={() => setToolCallingMode(!toolCallingMode)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                        toolCallingMode 
-                          ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300' 
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                      title="Pilot System: Two-agent architecture (Pilot + Executor)"
-                    >
-                      {toolCallingMode ? '🚀 Pilot ON' : '🚀 Pilot'}
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setToolCallingMode(!toolCallingMode)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                          toolCallingMode 
+                            ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300' 
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                        title="Pilot System: Two-agent architecture (Pilot + Executor)"
+                      >
+                        {toolCallingMode ? '🚀 Pilot ON' : '🚀 Pilot'}
+                      </button>
+                      {/* Orchestrator Toggle */}
+                      {toolCallingMode && (
+                        <button
+                          onClick={() => setUseOrchestrator(!useOrchestrator)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                            useOrchestrator 
+                              ? 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-300' 
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                          title="Query Orchestrator: Analyzes request and creates task plan"
+                        >
+                          {useOrchestrator ? '🎯 Orch' : '🎯 Orch OFF'}
+                        </button>
+                      )}
+                    </div>
                   )}
                   
                   <div className="relative rounded-[14px] overflow-hidden bg-slate-50 ring-1 ring-slate-200 focus-within:ring-indigo-200 transition-all">
@@ -2499,16 +2535,32 @@ Example:
                 
                 {/* Tool-Calling Mode Toggle (standalone input) */}
                 {selectedModel === 'gpt-oss-20b' && (
-                  <button
-                    onClick={() => setToolCallingMode(!toolCallingMode)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition shadow-sm ${
-                      toolCallingMode 
-                        ? 'bg-emerald-500 text-white ring-2 ring-emerald-300' 
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {toolCallingMode ? '🚀 Pilot System ON' : '🚀 Enable Pilot System'}
-                </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setToolCallingMode(!toolCallingMode)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition shadow-sm ${
+                        toolCallingMode 
+                          ? 'bg-emerald-500 text-white ring-2 ring-emerald-300' 
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {toolCallingMode ? '🚀 Pilot ON' : '🚀 Pilot'}
+                    </button>
+                    {/* Orchestrator Toggle - only when Pilot is ON */}
+                    {toolCallingMode && (
+                      <button
+                        onClick={() => setUseOrchestrator(!useOrchestrator)}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition shadow-sm ${
+                          useOrchestrator 
+                            ? 'bg-indigo-500 text-white ring-2 ring-indigo-300' 
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                        title="Query Orchestrator: Analyzes request and creates task plan for Pilot"
+                      >
+                        {useOrchestrator ? '🎯 Orch ON' : '🎯 Orch OFF'}
+                      </button>
+                    )}
+                  </div>
                 )}
                 
                 <div className="w-full relative shadow-2xl rounded-[18px] overflow-hidden bg-white ring-1 ring-slate-200 focus-within:ring-indigo-200 transition-all">
