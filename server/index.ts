@@ -4223,22 +4223,26 @@ EXECUTOR: <one simple instruction>
    - Extract the specific value using extractor
 4. Keep instructions SIMPLE - describe one action
 
-CORRECT step-by-step flow:
+CORRECT step-by-step flow (for "Compare October vs November traffic"):
 Step 1: EXECUTOR: Use ga_list_properties to get all available properties.
         (wait for result)
 Step 2: EXECUTOR: Use extractor to find the property ID for "vibefam" from the properties.
         (wait for result)
-Step 3: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for November 2025.
-        (wait for result)
-Step 4: EXECUTOR: Analyze the daily trend data using llm and store in traffic_analysis.
-        (wait - you receive: "Stored in 'traffic_analysis'. Summary: <key findings>")
-Step 5: EXECUTOR: Display the traffic_analysis report to the user.
-        (wait - report is displayed on canvas)
-Step 6: REPLY: Explain what was displayed based on the summary you received.
+Step 3: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for October 2025.
+        (wait for result - stored in october_traffic)
+Step 4: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for November 2025.
+        (wait for result - stored in november_traffic)
+Step 5: EXECUTOR: Create a report using october_traffic and november_traffic. Calculate total sessions for each month and percentage change. Store in monthly_totals.
+        (wait - you receive detailed summary: "October: 15,234 sessions, November: 12,890, Change: -15.4%, Peak: Oct 15...")
+Step 6: EXECUTOR: Add insight to monthly_totals with title 'Why Traffic Declined' and insight 'The 15.4% drop in November likely reflects the end of Q3 marketing campaigns. October benefited from back-to-school promotions driving 8 high-traffic days versus only 5 in November.'
+        (wait - insight added)
+Step 7: EXECUTOR: Display the monthly_totals report to the user.
+        (wait - report with your insight is displayed)
+Step 8: REPLY: Explain what's shown including your insight about the traffic decline.
 
-WRONG - too many steps at once:
-❌ EXECUTOR: Get properties, find vibefam's ID, then get daily traffic and display it.
-❌ EXECUTOR: Use ga_daily_trend_report with the property ID (you don't have the ID yet!)
+WRONG - asking the tool to generate insights:
+❌ EXECUTOR: Create a report and explain why the traffic changed (YOU explain it!)
+❌ EXECUTOR: Analyze and provide insights (YOU provide insights using add_insight!)
 
 Each instruction = ONE action. Wait for the result before the next step.
 
@@ -4251,7 +4255,7 @@ REPLY: <your response>
 IMPORTANT - Your REPLY should:
 - Explain what you did and your thought process
 - Describe what's displayed on the canvas (tables, charts) - user can see them!
-- Share insights the llm tool provided (if any)
+- Share insights the report tool provided (if any)
 - Suggest next steps or ask follow-up questions
 - Be conversational and helpful
 
@@ -4303,24 +4307,45 @@ Tell the Executor which tool to use in natural language.
 ### Data Tools
 ${toolSummaries}
 ### Processing Tools
-• llm - DATA ANALYSIS AGENT: Analyzes DATA stored in VARIABLES
+• report - Creates a SINGLE FOCUSED analysis report from DATA stored in VARIABLES
   - ONLY use when you have data variables to analyze
   - It performs: sum, average, max, min, count, compare, percentages, filter, sort
-  - It creates a REPORT (stored in a variable) and a SUMMARY (shown to you)
-  - The REPORT contains instructions for what to display
+  - It creates a REPORT (stored in a variable) and a DETAILED SUMMARY (shown to you)
+  - The SUMMARY contains ALL calculated values so YOU can formulate insights
 
-  ⚠️ SCOPE: ONLY for analyzing fetched data in variables
-  ✅ CORRECT: "Analyze the daily traffic data and store in traffic_analysis"
-  ❌ WRONG: General questions, date calculations, or anything without data variables
+  ⚠️ CRITICAL - BREAK DOWN INTO MULTIPLE REPORTS:
+  - Create ONE report for ONE specific aspect of the analysis
+  - Review the SUMMARY you receive - it contains all the data
+  - Add YOUR insights using add_insight (see below)
+  - Then display the report
+  
+  Example breakdown for "Compare Q3 vs Q4 sales":
+  1. Create revenue_comparison report → review summary → add insight → display
+  2. Create top_products report → review summary → add insight → display
+
+  ⚠️ WHEN CALLING report, YOU MUST SPECIFY:
+  1. Which variables to use (by name)
+  2. What SINGLE aspect to analyze (not everything at once)
+  3. What calculations to perform
+  
+  ✅ CORRECT: "Create a report using q3_sales and q4_sales. Calculate total revenue per quarter and percentage change. Store in revenue_comparison."
+  ❌ WRONG: "Create a report with insights about why revenue changed" (YOU add insights after!)
+
+• add_insight - Add YOUR interpretation/insight to a report AFTER you see the summary
+  - YOU provide the insight text based on the summary data you received
+  - Specify: report variable, title, and your insight text
+  - Example: "Add insight to revenue_comparison with title 'Why Revenue Dropped' and insight 'The 15% decline in Q4 coincides with the end of summer promotions. Q3 benefited from back-to-school campaigns.'"
+  
+  ⚠️ YOU must write the insight - don't ask the tool to generate it!
 
 • extractor - Extract specific values from data into a variable
   - Use for finding specific items (like an ID from a list)
   - You DON'T see the value, just confirmation it's stored
 
 • display_report - Display an analysis report to the user
-  - Takes a report variable (created by llm) and shows it on canvas
-  - Generates tables, charts, and cards based on the report
-  - Example: "Display the traffic_analysis report to the user"
+  - Takes a report variable and shows it on canvas
+  - Call AFTER adding your insights
+  - Example: "Display the revenue_comparison report to the user"
 
 ### Manual Display Tools (only if needed separately)
 • table - Display data as a table
@@ -4328,10 +4353,13 @@ ${toolSummaries}
 • card - Display markdown content
 • alert - Display an important notice
 
-⚠️ IMPORTANT WORKFLOW:
-1. Call llm to analyze the data → report stored in variable, you see SUMMARY
-2. Tell Executor to display the report → "Display the <variable> to the user"
-3. REPLY to user explaining what's displayed (based on the SUMMARY you received)
+⚠️ IMPORTANT WORKFLOW - CREATE, ADD INSIGHT, THEN DISPLAY:
+1. Create a FOCUSED report (calculations only) → stored in variable, you see DETAILED SUMMARY
+2. Review the summary - it has all the numbers you need
+3. Add YOUR insight using add_insight → "Add insight to <variable> with title '...' and insight '...'"
+4. Display the report → "Display the <variable> to the user"
+5. Repeat for the next aspect of the analysis
+6. After ALL reports are displayed → REPLY to user
 
 ================================================================================
 ## ⚠️ STEP-BY-STEP EXECUTION RULES
@@ -4349,9 +4377,19 @@ TYPICAL FLOW:
 1. Fetch data (ga_list_properties, etc.)
 2. Extract specific value if needed (extractor)
 3. Use extracted value in next tool (e.g., get report with property_id)
-4. Analyze the data (llm) → report stored, you see SUMMARY
-5. Display the report → "Display the <report_variable> to the user"
-6. Reply to user explaining what's displayed (use the SUMMARY)
+4. Create FIRST focused report (calculations only)
+5. Review the detailed summary you receive
+6. Add YOUR insight using add_insight
+7. Display the report
+8. (Repeat 4-7 for each aspect of analysis)
+9. Reply to user explaining what's displayed
+
+Example for "Compare Q3 vs Q4 sales":
+- Step 4: Create revenue_comparison report 
+- Step 5: (see summary with all numbers)
+- Step 6: Add insight "The 20% revenue increase in Q4 is driven by holiday shopping..."
+- Step 7: Display revenue_comparison
+- Step 8: REPLY summarizing the analysis with your insights
 
 ================================================================================
 ## GUIDELINES
@@ -4365,18 +4403,18 @@ TYPICAL FLOW:
 6. Your REPLY explains and describes - never fabricates data
 
 ================================================================================
-## ❌ DO NOT USE llm FOR THESE
+## ❌ DO NOT USE report FOR THESE
 ================================================================================
 
-The llm tool is STRICTLY for analyzing DATA stored in VARIABLES.
+The report tool is STRICTLY for analyzing DATA stored in VARIABLES.
 
-DO NOT use llm for:
+DO NOT use report for:
 - Date ranges or date formatting (you know how dates work)
 - Simple calculations or conversions
 - General knowledge questions
 - Anything that doesn't involve analyzing fetched data variables
 
-ONLY use llm when you have actual data variables to analyze!
+ONLY use report when you have actual data variables to analyze!
 
 ================================================================================
 
@@ -4399,7 +4437,8 @@ function extractMentionedTools(instruction: string): string[] {
   }
   
   // Also check for built-in tools
-  if (instructionLower.includes('llm') || instructionLower.includes('analyz')) mentioned.push('llm');
+  if (instructionLower.includes('report') || instructionLower.includes('create a report') || instructionLower.includes('analyz')) mentioned.push('report');
+  if (instructionLower.includes('add_insight') || instructionLower.includes('add insight') || instructionLower.includes('add an insight')) mentioned.push('add_insight');
   if (instructionLower.includes('extractor') || instructionLower.includes('extract')) mentioned.push('extractor');
   if (instructionLower.includes('display_report') || instructionLower.includes('display') && instructionLower.includes('report')) mentioned.push('display_report');
   if (instructionLower.includes('table')) mentioned.push('table');
@@ -4475,11 +4514,11 @@ function buildToolDocsForExecutor(toolIds: string[]): string {
     }
     
     // Built-in tools
-    if (toolId === 'llm') {
-      result += `### llm (Data Analysis Agent)
-Analyzes data and stores a report in a variable. Use display_report to show it.
+    if (toolId === 'report') {
+      result += `### report (Report Generator)
+Creates analysis reports from data variables. Use display_report to show it.
 
-Syntax: \`variable_name: llm(data: [var1, var2], question: "analysis request")\`
+Syntax: \`variable_name: report(data: [var1, var2], question: "what to analyze and include in report")\`
 
 What it does:
 - Performs calculations: sum, average, max, min, count
@@ -4490,12 +4529,31 @@ What it does:
 Returns: "Stored in 'variable_name'" (the Pilot also receives the SUMMARY)
 
 WORKFLOW:
-1. Call llm to analyze data: \`traffic_report: llm(data: [daily_traffic], question: "...")\`
-2. Display the report: \`display_report(traffic_report)\`
+1. Create report: \`sales_report: report(data: [q3_sales, q4_sales], question: "Compare Q3 and Q4 revenue, calculate percentage change, identify top products")\`
+2. Display the report: \`display_report(sales_report)\`
 
 Example:
 \`\`\`
-traffic_analysis: llm(data: [october_traffic, november_traffic], question: "Compare October and November traffic trends")
+sales_analysis: report(data: [october_sales, november_sales], question: "Calculate total revenue per month, percentage change, and identify best selling products")
+\`\`\`
+
+`;
+    }
+    
+    if (toolId === 'add_insight') {
+      result += `### add_insight
+Add an insight card to an existing report. The Pilot provides the insight text based on the summary data.
+
+Syntax: \`add_insight(report: report_variable_name, title: "Insight Title", insight: "The insight text provided by Pilot")\`
+
+What it does:
+- Adds a new card with the Pilot's insight to the specified report variable
+- The insight is added to the report's display instructions
+- Display the report afterward to show the new insight
+
+Example:
+\`\`\`
+add_insight(report: monthly_totals, title: "Why Traffic Declined", insight: "The 15.4% drop in November traffic coincides with the end of the Q3 marketing campaign. October benefited from back-to-school promotions that drove 8 high-traffic days.")
 \`\`\`
 
 `;
@@ -6922,7 +6980,12 @@ Describe each visualization in natural language:
 Include cards with analysis insights - use the actual computed numbers!
 
 SUMMARY:
-<A concise 1-3 sentence summary of key findings>
+Provide a DETAILED summary with ALL calculated values so the Pilot can formulate insights.
+Format:
+- List ALL computed numbers (totals, averages, percentages, changes)
+- Include comparisons (X vs Y, up/down by Z%)
+- Note any significant patterns (peaks, drops, trends)
+- This data helps the Pilot add interpretive insights later
 
 ================================================================================
 ## EXAMPLE
@@ -6958,7 +7021,15 @@ Change: **-15.4%** decrease
 The decline suggests seasonal patterns or campaign timing effects.
 
 SUMMARY:
-October had 15,234 total sessions, down 15.4% from November's 12,890. Traffic peaked mid-month with 8 high-traffic days.
+CALCULATED VALUES:
+- October total: 15,234 sessions
+- November total: 12,890 sessions  
+- Change: -2,344 sessions (-15.4%)
+- October daily average: 491 sessions
+- November daily average: 430 sessions
+- High traffic days (>500): 8 days in October, 5 in November
+- Peak day: October 15th with 823 sessions
+PATTERNS: Traffic declined 15.4% month-over-month. October had more consistent high-traffic days. Mid-month showed strongest performance in both months.
 \`\`\`
 
 ================================================================================
@@ -8599,12 +8670,12 @@ async function runExecutorAgent(
     });
     
     // Execute the tool
-    if (call.toolName === 'llm') {
-      // LLM tool - Data Analysis Agent, stores result in variable
+    if (call.toolName === 'report' || call.toolName === 'llm') {
+      // Report tool - Data Analysis Agent, stores result in variable
       const parsedRefs: string[] = [];
       
-      console.log(`[Executor LLM/Analysis] Raw call.args: ${JSON.stringify(call.args)}`);
-      console.log(`[Executor LLM/Analysis] Variable name: ${call.variableName}`);
+      console.log(`[Executor Report] Raw call.args: ${JSON.stringify(call.args)}`);
+      console.log(`[Executor Report] Variable name: ${call.variableName}`);
       
       // The args might be a string (raw args) or object (parsed key-value pairs)
       let dataStr = '';
@@ -8625,8 +8696,8 @@ async function runExecutorAgent(
         questionStr = call.args.question || '';
       }
       
-      console.log(`[Executor LLM/Analysis] dataStr: ${dataStr}`);
-      console.log(`[Executor LLM/Analysis] questionStr: ${questionStr}`);
+      console.log(`[Executor Report] dataStr: ${dataStr}`);
+      console.log(`[Executor Report] questionStr: ${questionStr}`);
       
       // Extract all variable references (both var[col] and just var)
       const refMatches = dataStr.matchAll(/([a-zA-Z_][a-zA-Z0-9_]*(?:\[[a-zA-Z_][a-zA-Z0-9_]*\])?)/g);
@@ -8636,7 +8707,7 @@ async function runExecutorAgent(
         }
       }
       
-      console.log(`[Executor LLM/Analysis] Parsed refs: ${JSON.stringify(parsedRefs)}`);
+      console.log(`[Executor Report] Parsed refs: ${JSON.stringify(parsedRefs)}`);
       
       const question = questionStr;
       
@@ -8791,6 +8862,79 @@ async function runExecutorAgent(
       } else {
         toolResponse = `Extraction completed but no variable name provided to store the result.`;
         report = `Extractor ran but result was not stored (no variable name).`;
+      }
+    }
+    else if (call.toolName === 'add_insight') {
+      // Add Insight tool - adds an insight card to an existing report
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`💡 ADD INSIGHT TOOL`);
+      console.log(`${'='.repeat(60)}\n`);
+      
+      // Parse the arguments
+      let reportVarName = '';
+      let insightTitle = '';
+      let insightText = '';
+      
+      if (typeof call.args === 'string') {
+        // Parse from raw string: add_insight(report: var, title: "...", insight: "...")
+        const reportMatch = call.args.match(/report:\s*([a-zA-Z_][a-zA-Z0-9_]*)/);
+        const titleMatch = call.args.match(/title:\s*["']([^"']+)["']/);
+        const insightMatch = call.args.match(/insight:\s*["']([^"']+)["']/);
+        
+        if (reportMatch) reportVarName = reportMatch[1];
+        if (titleMatch) insightTitle = titleMatch[1];
+        if (insightMatch) insightText = insightMatch[1];
+      } else if (typeof call.args === 'object') {
+        reportVarName = call.args.report || '';
+        insightTitle = call.args.title || '';
+        insightText = call.args.insight || '';
+      }
+      
+      // Also try to parse from raw call
+      if (!reportVarName && call.raw) {
+        const match = call.raw.match(/add_insight\s*\(\s*report:\s*([a-zA-Z_][a-zA-Z0-9_]*)/i);
+        if (match) reportVarName = match[1];
+      }
+      if (!insightTitle && call.raw) {
+        const match = call.raw.match(/title:\s*["']([^"']+)["']/);
+        if (match) insightTitle = match[1];
+      }
+      if (!insightText && call.raw) {
+        const match = call.raw.match(/insight:\s*["']([^"']+)["']/);
+        if (match) insightText = match[1];
+      }
+      
+      console.log(`   Report variable: ${reportVarName}`);
+      console.log(`   Title: ${insightTitle}`);
+      console.log(`   Insight: ${insightText.slice(0, 100)}...`);
+      
+      if (!reportVarName) {
+        toolResponse = 'Error: No report variable specified';
+        report = 'add_insight failed - no report variable provided';
+      } else if (!insightText) {
+        toolResponse = 'Error: No insight text provided';
+        report = 'add_insight failed - no insight text provided';
+      } else {
+        // Get the report variable and add the insight
+        const reportVar = variables.get(reportVarName);
+        if (!reportVar || !reportVar.actualData) {
+          toolResponse = `Error: Report variable '${reportVarName}' not found`;
+          report = `add_insight failed - variable '${reportVarName}' not found`;
+        } else {
+          // Add the insight as a new card instruction to the report
+          const cardTitle = insightTitle || 'Insight';
+          const insightCard = `\n\nCreate a card titled '${cardTitle}' with the following content:\n${insightText}`;
+          
+          // Append to the existing report
+          reportVar.actualData.report = (reportVar.actualData.report || '') + insightCard;
+          
+          console.log(`\n✅ INSIGHT ADDED TO REPORT`);
+          console.log(`   Card title: ${cardTitle}`);
+          console.log(`   Added to: ${reportVarName}`);
+          
+          toolResponse = `Insight added to '${reportVarName}'. Display the report to show it.`;
+          report = `Added insight "${cardTitle}" to ${reportVarName}. Use display_report to show it.`;
+        }
       }
     }
     else if (call.toolName === 'display_report') {
@@ -9045,11 +9189,13 @@ You are a Query Orchestrator. Your job is to take a user's request and create a 
 ${toolSummaries}
 
 ### Processing Tools
-• llm - Analyze data stored in variables. Performs: sum, average, max, min, count, compare, percentages, filter, sort, correlations. Outputs a REPORT variable and SUMMARY.
+• report - Creates ONE FOCUSED analysis report with calculations only. Outputs a REPORT variable and DETAILED SUMMARY with all calculated values.
+  IMPORTANT: Break analysis into MULTIPLE focused reports. The Pilot receives a detailed summary to formulate insights.
+• add_insight - Pilot adds interpretive insights to a report AFTER seeing the summary. Pilot provides: report variable, title, insight text.
 • extractor - Extract specific values from data (e.g., find a specific ID from a list)
 
 ### Display Tools
-• display_report - Render an analysis report (tables, charts, cards) to the canvas
+• display_report - Render an analysis report (tables, charts, cards) to the canvas. Call AFTER adding insights.
 • table - Display data as a table with columns
 • line-chart - Display trends over time as a line chart
 • card - Display text/markdown content
@@ -9059,7 +9205,9 @@ ${toolSummaries}
 - Tools often have DEPENDENCIES (e.g., need account_id from list_accounts before calling get_report)
 - The Pilot can only execute ONE step at a time
 - The Pilot cannot see raw data values, only variable names and schemas
-- Analysis must be done via the llm tool, not by the Pilot directly
+- Calculations must be done via the report tool, interpretations via add_insight
+- CRITICAL WORKFLOW: Create report (calculations) → Pilot reviews detailed summary → Pilot adds insight → Display report
+- The Pilot formulates insights based on the summary data - the report tool does NOT generate interpretations
 
 ================================================================================
 ## OUTPUT FORMAT
@@ -9138,15 +9286,16 @@ Phase 1: Data Collection
 - Fetch sales report for Q3 2025
 - Fetch sales report for Q4 2025
 
-Phase 2: Analysis
-- Use llm tool to analyze both quarters' data
-- Calculate totals, averages, and percentage changes
-- Identify key insights and trends
-- Store analysis in a report variable
+Phase 2: Analysis & Display (create report → add insight → display)
+- Create revenue_totals report: Calculate total revenue per quarter and percentage change
+- Pilot reviews summary (e.g., "Q3: $45K, Q4: $52K, +15.5%")
+- Pilot adds insight explaining WHY (e.g., "Q4 growth driven by holiday promotions")
+- Display the report with insight
+- Repeat for: top_products report, metrics_comparison report
 
-Phase 3: Display & Response
-- Display the analysis report (will show comparison table, charts, insights)
-- Explain the key findings: which quarter performed better, by how much, any notable patterns
+Phase 3: Response
+- After all reports with insights are displayed, REPLY summarizing
+- Reference the insights already shown on canvas
 
 NOTES FOR PILOT:
 - Q3 2025 is 2025-07-01 to 2025-09-30
@@ -9230,16 +9379,17 @@ Phase 1: Data Collection
 - Fetch product performance data
 - Fetch return data if available
 
-Phase 2: Analysis
-- Use llm to analyze product data
-- Identify products with: low revenue, high return rate, declining trend
-- Compare to category averages
-- Generate specific recommendations per issue type
-- Store comprehensive analysis in report variable
+Phase 2: Analysis & Display (create report → add insight → display)
+- Create low_revenue_products report: Identify products with revenue below category average
+- Pilot reviews summary and adds insight about likely causes
+- Display the report
+- Create high_returns_report: Find products with return rate above 10%
+- Pilot adds insight with recommendations (e.g., "Consider quality review for Product X")
+- Display the report
 
-Phase 3: Display & Response
-- Display the analysis report
-- Emphasize actionable recommendations
+Phase 3: Response
+- After all reports with insights are displayed, REPLY with summary
+- The insights and recommendations are already on canvas
 - Offer to dive deeper into specific products
 
 NOTES FOR PILOT:
@@ -9441,7 +9591,7 @@ Follow the task plan above, executing ONE step at a time.`;
   let finalMessage = '';
   let executorReport: string | null = null;
   let pilotTurn = 0;
-  const maxPilotTurns = 10;
+  const maxPilotTurns = 50;
   
   sendEvent({
     type: 'pilot_system_started',
