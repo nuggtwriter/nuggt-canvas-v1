@@ -4223,9 +4223,7 @@ EXECUTOR: <one simple instruction in natural language>
 
 Tools available via EXECUTOR:
 - Data fetching tools (ga_list_properties, ga_daily_trend_report, etc.)
-- Display tools (table, line-chart, card, alert)
-- display_report (to show analysis reports)
-- add_insight (to add your insights to reports)
+- Use for fetching data from external sources ONLY
 
 ### OPTION 2: Instruct the Data Agent
 Give ONE instruction IN NATURAL LANGUAGE for computation, transformation, or extraction.
@@ -4261,7 +4259,23 @@ Examples:
 
 ⚠️ Ask specific data questions (what, how much) or transformation requests - NOT why questions (YOU interpret!)
 
-### OPTION 3: Reply to User
+### OPTION 3: Instruct the Display Agent
+For rendering tables, charts, and cards on the canvas.
+
+Format:
+DISPLAY: <natural language instruction for what to display>
+
+Available display tools:
+- table: Display data in a table format
+- line-chart: Display data as a line chart
+- card: Display text/insights in a card
+
+Examples:
+- "DISPLAY: Create a table showing traffic_data with columns date, sessions, and users."
+- "DISPLAY: Show a line chart titled 'Daily Sessions' with traffic_data, date on x-axis and sessions on y-axis."
+- "DISPLAY: Create a card titled 'Traffic Summary' with the key findings from traffic_comparison."
+
+### OPTION 4: Reply to User
 When you have completed the task and displayed results to the user.
 
 Format:
@@ -4282,17 +4296,17 @@ Step 4: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for N
         (wait for result)
 Step 5: DATA: Using october_traffic and november_traffic, answer: What is the total sessions for October? What is the total sessions for November? What is the percentage change? Store in traffic_comparison.
         (wait - you receive answers: "October total: 15,234 sessions. November total: 12,890 sessions. Change: -15.4%..." - also stored in traffic_comparison for later use)
-Step 6: Based on the answers, formulate YOUR interpretation and display it
-        EXECUTOR: Create a card titled 'Traffic Comparison' with the key findings and your insight about why traffic may have declined.
+Step 6: DISPLAY: Create a card titled 'Traffic Comparison' summarizing that October had 15,234 sessions, November had 12,890 sessions, a -15.4% decline, and my insight that this may be due to seasonal changes.
         (wait - card displayed)
-Step 7: REPLY: Explain what you found including your insight about the traffic decline.
+Step 7: DISPLAY: Create a line chart titled 'Daily Traffic Comparison' showing october_traffic with date on x-axis and sessions on y-axis.
+        (wait - chart displayed)
+Step 8: REPLY: Explain what you found including your insight about the traffic decline.
 
 WRONG:
 ❌ EXECUTOR: ga_list_properties() (use natural language, not syntax!)
-❌ EXECUTOR: ga_daily_trend_report(property_id=...) (use natural language!)
-❌ EXECUTOR: Analyze the traffic data (use DATA: for computation!)
+❌ EXECUTOR: Create a table... (use DISPLAY: for tables/charts/cards!)
 ❌ DATA: Why did traffic decline? (YOU interpret the numbers!)
-❌ DATA: Analyze the data and create a report (ask specific questions!)
+❌ DISPLAY: Analyze the data (use DATA: for computation, DISPLAY: is for rendering!)
 
 Each instruction = ONE action. Wait for the result before the next step.
 
@@ -4376,17 +4390,17 @@ ${toolSummaries}
   - Finds specific items (like an ID from a list)
   - Use: "Extract X from Y. Store in Z."
 
-### Display Tools (use via EXECUTOR:)
+### DISPLAY Agent Tools (use via DISPLAY:)
 • table - Display data as a table (use variable references)
 • line-chart - Display data as a line chart (use variable references)
 • card - Display markdown content (for your insights and findings)
-• alert - Display an important notice
 
 ⚠️ IMPORTANT WORKFLOW:
-1. DATA: Ask specific questions about your variables → you receive direct answers
-2. Review the answers - use them to formulate YOUR insight
-3. EXECUTOR: Display your findings using card, table, or chart
-4. REPLY: Explain to user what you found
+1. EXECUTOR: Fetch data from external sources
+2. DATA: Ask specific questions about your variables → you receive direct answers
+3. Review the answers - use them to formulate YOUR insight
+4. DISPLAY: Render your findings using card, table, or chart
+5. REPLY: Explain to user what you found
 
 ================================================================================
 ## ⚠️ STEP-BY-STEP EXECUTION RULES
@@ -4394,8 +4408,9 @@ ${toolSummaries}
 
 1. ONE instruction per turn - never combine multiple steps
 2. Use the right prefix:
-   - EXECUTOR: for data fetching and display
-   - DATA: for analysis and extraction
+   - EXECUTOR: for data fetching from external sources
+   - DATA: for compute/transform/extraction
+   - DISPLAY: for tables, charts, cards on canvas
    - REPLY: to respond to user
 3. Wait for the agent's report before deciding the next step
 4. Think: "What is the ONE thing I need to do next?"
@@ -4462,13 +4477,8 @@ function extractMentionedTools(instruction: string): string[] {
     }
   }
   
-  // Also check for built-in tools (compute and extractor are handled by DATA AGENT, not Executor)
-  if (instructionLower.includes('add_insight') || instructionLower.includes('add insight') || instructionLower.includes('add an insight')) mentioned.push('add_insight');
-  if (instructionLower.includes('display_report') || instructionLower.includes('display') && instructionLower.includes('report')) mentioned.push('display_report');
-  if (instructionLower.includes('table')) mentioned.push('table');
-  if (instructionLower.includes('line-chart') || instructionLower.includes('chart')) mentioned.push('line-chart');
-  if (instructionLower.includes('card')) mentioned.push('card');
-  if (instructionLower.includes('alert')) mentioned.push('alert');
+  // Note: table, line-chart, card are now handled by DISPLAY AGENT, not Executor
+  // Executor only handles data-fetching tools (MCP sub-tools)
   
   return [...new Set(mentioned)]; // Remove duplicates
 }
@@ -10389,7 +10399,7 @@ ${toolSummaries}
   Operations: filter, sort, rolling avg/sum, cumsum, lag/lead, rank, top/bottom N, group by, normalize, standardize, percent of total.
 • extractor - Extract specific values from data (e.g., find a specific ID from a list). Stores result in a variable.
 
-### Display Tools
+### Display Tools (via DISPLAY Agent)
 • table - Display data as a table with columns
 • line-chart - Display trends over time as a line chart
 • card - Display text/markdown content (for findings and insights)
@@ -10645,8 +10655,8 @@ async function runQueryOrchestrator(
 }
 
 // Clean Pilot output - handle tag conflicts (keep first tag only)
-function cleanPilotOutput(rawOutput: string): { tag: 'EXECUTOR' | 'DATA' | 'REPLY' | null; content: string; wasCleaned: boolean } {
-  const tags = ['EXECUTOR:', 'DATA:', 'REPLY:'];
+function cleanPilotOutput(rawOutput: string): { tag: 'EXECUTOR' | 'DATA' | 'DISPLAY' | 'REPLY' | null; content: string; wasCleaned: boolean } {
+  const tags = ['EXECUTOR:', 'DATA:', 'DISPLAY:', 'REPLY:'];
   const upperOutput = rawOutput.toUpperCase();
   
   // Find first tag and its position
@@ -10678,7 +10688,7 @@ function cleanPilotOutput(rawOutput: string): { tag: 'EXECUTOR' | 'DATA' | 'REPL
   const content = rawOutput.slice(contentStart, secondTagIndex).trim();
   const wasCleaned = secondTagIndex < rawOutput.length;
   
-  const tagName = firstTag.replace(':', '') as 'EXECUTOR' | 'DATA' | 'REPLY';
+  const tagName = firstTag.replace(':', '') as 'EXECUTOR' | 'DATA' | 'DISPLAY' | 'REPLY';
   
   if (wasCleaned) {
     console.log(`[Pilot] Tag conflict detected - cleaned output. Kept: ${tagName}, removed content after position ${secondTagIndex}`);
@@ -11226,6 +11236,238 @@ If extracting multiple fields, return: {"field1": value1, "field2": value2, ...}
   }
 }
 
+// ================================================================================
+// DISPLAY AGENT - Handles table, line-chart, and card display tools
+// ================================================================================
+
+// Build the Display Agent's system prompt (uses same syntax as Executor)
+function buildDisplayAgentPrompt(
+  task: string,
+  variablesContext: string
+): string {
+  return `# DISPLAY AGENT
+
+You translate the Pilot's natural language instructions into display tool calls for rendering tables, charts, and cards on the canvas.
+
+================================================================================
+## TASK FROM PILOT (Natural Language)
+================================================================================
+
+${task}
+
+================================================================================
+## YOUR JOB
+================================================================================
+
+1. Understand what the Pilot wants to display
+2. Translate it into the proper tool call syntax
+3. Use the correct variables and columns
+4. Execute the display tool call
+
+The Pilot says things like:
+- "Create a table showing traffic_data with columns date and sessions" → table
+- "Show a line chart of traffic_data with date on x-axis and sessions on y-axis" → line-chart
+- "Create a card titled 'Summary' with key findings about the traffic analysis" → card
+
+================================================================================
+## TOOL DOCUMENTATION
+================================================================================
+
+### table
+Display data as a table on the Canvas. Users can see this table.
+
+Syntax: \`table({column_name: "Label", data: var[field]}, {column_name: "Label2", data: var[field2]}, ...)\`
+Returns: Confirmation that table was displayed
+
+You can use:
+- Original data variables: daily_traffic[date], daily_traffic[sessions]
+- Analysis variables: nov_sessions, comparison_data
+
+Example with original data:
+\`table({column_name: "Date", data: daily_traffic[date]}, {column_name: "Sessions", data: daily_traffic[sessions]})\`
+
+Example with analysis variable:
+\`table({column_name: "Month", data: comparison_table[month]}, {column_name: "Total", data: comparison_table[total]})\`
+
+### line-chart
+Display data as a line chart on the Canvas. Great for showing trends over time.
+
+Syntax: \`line-chart(x_data: var[x_field], y_data: var[y_field], x_label: "X Axis", y_label: "Y Axis", colour: "#3b82f6")\`
+Returns: Confirmation that chart was displayed
+
+You can use:
+- Original data variables: daily_traffic[date], daily_traffic[sessions]
+- Analysis variables: sorted_sessions, filtered_data
+
+Example:
+\`line-chart(x_data: traffic_data[date], y_data: traffic_data[sessions], x_label: "Date", y_label: "Sessions")\`
+
+### card
+Display markdown content in a card on the Canvas. Use for summaries and insights.
+
+Syntax: \`card("## Title\\n\\nYour markdown content here")\`
+Returns: Confirmation that card was displayed
+
+Use this to display analysis findings, summaries, and insights.
+The markdown supports: headings, bold, italic, lists, but NOT tables.
+
+Example:
+\`card("## Traffic Summary\\n\\n**Total sessions:** 14,906\\n**Average daily:** 481\\n\\n### Key Insights\\n- Traffic peaked mid-month\\n- Engagement rate was 45%")\`
+
+================================================================================
+## EXISTING VARIABLES (Use these!)
+================================================================================
+
+${variablesContext || '(No variables yet)'}
+
+================================================================================
+## YOUR OUTPUT
+================================================================================
+
+Write ONE tool call that accomplishes what the Pilot asked.
+Then write DONE: with a brief summary.
+
+Format:
+<tool call>
+DONE: <what was displayed>
+
+================================================================================
+
+Now write the tool call for this task:`;
+}
+
+// Run the Display Agent
+async function runDisplayAgent(
+  instructions: string,
+  variables: Map<string, PilotVariable>,
+  generatedDSL: string[],
+  model: string,
+  sendEvent: (data: any) => void
+): Promise<{ success: boolean; report: string }> {
+  const client = createOpenRouterClient();
+  
+  console.log(`\n${'═'.repeat(80)}`);
+  console.log(`🖼️ DISPLAY AGENT`);
+  console.log(`${'═'.repeat(80)}`);
+  console.log(`Instructions: ${instructions}`);
+  
+  // Build variables context with descriptions
+  let variablesContext = '';
+  if (variables.size > 0) {
+    variablesContext = `Available variables:\n\n`;
+    for (const [name, variable] of variables) {
+      const accessKeys = Object.keys(variable.schema)
+        .map(key => `${name}[${key}]`)
+        .join(', ');
+      variablesContext += `📦 ${name}\n`;
+      variablesContext += `   Description: ${variable.description}\n`;
+      variablesContext += `   Access via: ${accessKeys}\n\n`;
+    }
+  }
+  
+  sendEvent({
+    type: 'display_agent_started',
+    task: instructions.slice(0, 200),
+    tools: ['table', 'line-chart', 'card']
+  });
+  
+  // Build prompt for Display Agent
+  const displayAgentPrompt = buildDisplayAgentPrompt(instructions, variablesContext);
+  
+  try {
+    // Call Display Agent LLM
+    sendEvent({ type: 'display_agent_thinking' });
+    
+    const response = await retryLLMCall(
+      () => client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: displayAgentPrompt },
+          { role: 'user', content: 'Write the tool call now:' }
+        ],
+        temperature: 0.3
+      }),
+      (res) => res.choices[0]?.message?.content || '',
+      'Display Agent'
+    );
+    
+    const displayAgentResponse = response.choices[0]?.message?.content || '';
+    
+    console.log(`\n📝 DISPLAY AGENT OUTPUT:\n${displayAgentResponse}\n`);
+    
+    sendEvent({
+      type: 'display_agent_step',
+      step: displayAgentResponse
+    });
+    
+    // Parse the tool call using existing parseToolCalls (same as Executor)
+    const toolCalls = parseToolCalls(displayAgentResponse);
+    
+    console.log(`[Display Agent] Parsed ${toolCalls.length} tool call(s)`);
+    if (toolCalls.length > 0) {
+      console.log(`[Display Agent] First call: ${toolCalls[0].toolName}(${JSON.stringify(toolCalls[0].args).slice(0, 200)})`);
+    }
+    
+    if (toolCalls.length === 0) {
+      const doneMatch = displayAgentResponse.match(/DONE:\s*(.+)/is);
+      if (doneMatch) {
+        console.log(`[Display Agent] No tool call found, but found DONE`);
+        return { success: true, report: doneMatch[1].trim() };
+      }
+      console.log(`[Display Agent] ERROR: No tool call and no DONE found`);
+      sendEvent({ type: 'display_agent_error', error: 'Could not parse tool call from response' });
+      return { success: false, report: 'Could not parse display tool call from response' };
+    }
+    
+    const call = toolCalls[0];
+    let report = '';
+    
+    sendEvent({
+      type: 'display_agent_calling_tool',
+      tool: call.toolName,
+      variable: call.variableName,
+      raw: call.raw
+    });
+    
+    // ========================================================================
+    // Execute the display tool (same as Executor handles UI tools)
+    // ========================================================================
+    
+    if (['line-chart', 'table', 'card', 'alert'].includes(call.toolName)) {
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`🎨 DISPLAY AGENT UI TOOL: ${call.toolName}`);
+      console.log(`   call.args type: ${typeof call.args}`);
+      console.log(`   call.args value: ${JSON.stringify(call.args).slice(0, 300)}`);
+      console.log(`${'='.repeat(60)}\n`);
+      
+      // Use the same executeUITool function as Executor
+      const result = executeUITool(call.toolName, call.args, variables as Map<string, ToolCallVariable>, sendEvent);
+      generatedDSL.push(result.dsl);
+      report = `Displayed ${call.toolName} to user.`;
+      
+      console.log(`   ✅ ${result.message}`);
+      
+      sendEvent({
+        type: 'display_agent_tool_success',
+        tool: call.toolName,
+        message: result.message
+      });
+    }
+    else {
+      console.log(`[Display Agent] ERROR: Unknown tool ${call.toolName}`);
+      sendEvent({ type: 'display_agent_error', error: `Unknown tool: ${call.toolName}` });
+      return { success: false, report: `Unknown display tool: ${call.toolName}. Use 'table', 'line-chart', or 'card'.` };
+    }
+    
+    return { success: true, report };
+    
+  } catch (error: any) {
+    console.log(`\n❌ DISPLAY AGENT ERROR: ${error.message}`);
+    sendEvent({ type: 'display_agent_error', error: error.message });
+    return { success: false, report: `Display Agent error: ${error.message}` };
+  }
+}
+
 // Run the Pilot agent for one turn
 async function runPilotAgent(
   userMessage: string,
@@ -11234,7 +11476,7 @@ async function runPilotAgent(
   pilotHistory: Array<{ role: string; content: string }>,
   model: string,
   sendEvent: (data: any) => void
-): Promise<{ action: 'EXECUTOR' | 'DATA' | 'REPLY'; content: string }> {
+): Promise<{ action: 'EXECUTOR' | 'DATA' | 'DISPLAY' | 'REPLY'; content: string }> {
   const client = createOpenRouterClient();
   
   const toolSummaries = buildToolSummariesForPilot();
@@ -11244,9 +11486,9 @@ async function runPilotAgent(
   // Build user message for this turn
   let userContent = '';
   if (executorReport) {
-    userContent = `AGENT REPORT:\n${executorReport}\n\nBased on this result, what is your NEXT SINGLE STEP?\n\nRemember: Give ONE instruction at a time. Think about what you learned and what you need next.\n\n(EXECUTOR: for data fetching/display OR DATA: for analysis/extraction OR REPLY: final response)`;
+    userContent = `AGENT REPORT:\n${executorReport}\n\nBased on this result, what is your NEXT SINGLE STEP?\n\nRemember: Give ONE instruction at a time. Think about what you learned and what you need next.\n\n(EXECUTOR: for data fetching | DATA: for compute/transform/extract | DISPLAY: for tables/charts/cards | REPLY: final response)`;
   } else {
-    userContent = `USER REQUEST:\n${userMessage}\n\nWhat is your FIRST STEP to address this request?\n\nRemember: Give ONE instruction at a time. You'll see the results before deciding the next step.\n\n(EXECUTOR: for data fetching/display OR DATA: for analysis/extraction OR REPLY: if you can answer directly)`;
+    userContent = `USER REQUEST:\n${userMessage}\n\nWhat is your FIRST STEP to address this request?\n\nRemember: Give ONE instruction at a time. You'll see the results before deciding the next step.\n\n(EXECUTOR: for data fetching | DATA: for compute/transform/extract | DISPLAY: for tables/charts/cards | REPLY: if you can answer directly)`;
   }
   
   // Add to history
@@ -11308,6 +11550,9 @@ async function runPilotAgent(
     else if (tag === 'DATA') {
       return { action: 'DATA', content: cleanedContent };
     }
+    else if (tag === 'DISPLAY') {
+      return { action: 'DISPLAY', content: cleanedContent };
+    }
     else if (tag === 'REPLY') {
       return { action: 'REPLY', content: cleanedContent };
     }
@@ -11323,6 +11568,12 @@ async function runPilotAgent(
       if (rawPilotResponse.toLowerCase().includes('analyze') || 
           rawPilotResponse.toLowerCase().includes('extract')) {
         return { action: 'DATA', content: rawPilotResponse };
+      }
+      // Check for display keywords
+      if (rawPilotResponse.toLowerCase().includes('table') || 
+          rawPilotResponse.toLowerCase().includes('chart') ||
+          rawPilotResponse.toLowerCase().includes('card')) {
+        return { action: 'DISPLAY', content: rawPilotResponse };
       }
       return { action: 'REPLY', content: rawPilotResponse };
     }
@@ -11484,6 +11735,27 @@ Follow the task plan above, executing ONE step at a time.`;
         reportParts.push(`Created variables: ${dataResult.newVariables.join(', ')}`);
       }
       executorReport = reportParts.join('\n');
+    }
+    else if (pilotResult.action === 'DISPLAY') {
+      // Pilot wants Display Agent to render tables/charts/cards
+      const instructions = pilotResult.content;
+      
+      sendEvent({
+        type: 'pilot_instructing_display_agent',
+        instructions: instructions.slice(0, 300)
+      });
+      
+      // Run Display Agent
+      const displayResult = await runDisplayAgent(
+        instructions,
+        variables,
+        generatedDSL,
+        model,
+        sendEvent
+      );
+      
+      // Prepare report for next Pilot turn
+      executorReport = displayResult.report;
     }
   }
   
