@@ -4228,27 +4228,38 @@ Tools available via EXECUTOR:
 - add_insight (to add your insights to reports)
 
 ### OPTION 2: Instruct the Data Agent
-Give ONE instruction IN NATURAL LANGUAGE for computation or extraction.
+Give ONE instruction IN NATURAL LANGUAGE for computation, transformation, or extraction.
 
 Format:
-DATA: <natural language questions about your data>
+DATA: <natural language instruction>
 
 For Computation (compute tool) - ASK SPECIFIC QUESTIONS:
 - Aggregations: sum, average, min, max, count
 - Arithmetic: add, subtract, multiply, divide (two values)
 - Percentages: percentage, pct_change
 - Lookup: find a value in one column where another column meets a condition
-- Ask specific questions - you'll get direct answers back
-- You can ask multiple questions at once
+- You'll get direct answers back
+- ALWAYS provide a descriptive variable name to store answers (e.g., "Store in oct_nov_comparison")
+- The variable lets you pass these answers to other agents later if needed
 
-For Extraction (extractor tool) - specify: what to extract, from which variable, where to store
+For Transformation (transform tool) - MODIFY DATA:
+- Filter & Sort: filter rows by condition, sort ascending/descending
+- Rolling: rolling average, rolling sum, cumulative sum, lag, lead
+- Ranking: rank, dense rank, top N, bottom N, percentile rank
+- Grouping: sum/avg/count/max/min by category
+- Normalization: normalize (0-1), standardize (z-score), percent of total
+- Column math: add/subtract/multiply/divide columns
+- Specify what data to transform and where to store result
+
+For Extraction (extractor tool) - EXTRACT VALUES:
+- Specify: what to extract, from which variable, where to store
 
 Examples:
-- "DATA: Using october_traffic and november_traffic, answer: What is the total sessions for October? What is the total sessions for November? What is the percentage change?"
-- "DATA: Using daily_sales, answer: What is the total revenue? What is the average daily revenue? Which day had the highest sales?"
+- "DATA: Using october_traffic and november_traffic, answer: What is the total sessions for October? What is the percentage change? Store in oct_nov_comparison."
+- "DATA: Using traffic_data, filter rows where sessions > 500. Store in high_traffic_days."
 - "DATA: Extract the property_id for 'vibefam' from the properties data. Store in prop_id."
 
-⚠️ Ask specific data questions (what, how much, how many, which) - NOT why questions (YOU interpret!)
+⚠️ Ask specific data questions (what, how much) or transformation requests - NOT why questions (YOU interpret!)
 
 ### OPTION 3: Reply to User
 When you have completed the task and displayed results to the user.
@@ -4269,8 +4280,8 @@ Step 3: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for O
         (wait for result)
 Step 4: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for November 2025. Store in november_traffic.
         (wait for result)
-Step 5: DATA: Using october_traffic and november_traffic, answer: What is the total sessions for October? What is the total sessions for November? What is the percentage change? Which were the top 3 days by sessions in each month?
-        (wait - you receive answers: "October total: 15,234 sessions. November total: 12,890 sessions. Change: -15.4%. Top days: Oct 15 (892), Oct 22 (845)...")
+Step 5: DATA: Using october_traffic and november_traffic, answer: What is the total sessions for October? What is the total sessions for November? What is the percentage change? Store in traffic_comparison.
+        (wait - you receive answers: "October total: 15,234 sessions. November total: 12,890 sessions. Change: -15.4%..." - also stored in traffic_comparison for later use)
 Step 6: Based on the answers, formulate YOUR interpretation and display it
         EXECUTOR: Create a card titled 'Traffic Comparison' with the key findings and your insight about why traffic may have declined.
         (wait - card displayed)
@@ -4346,17 +4357,23 @@ BAD variable names:
 ### Data Tools (use via EXECUTOR:)
 ${toolSummaries}
 ### DATA Agent Tools (use via DATA:)
-• Compute - Runs calculations on data and answers your specific questions
-  - Aggregations: sum, average, min, max, count (on columns)
+• Compute - Runs calculations and answers specific questions (returns values directly)
+  - Aggregations: sum, average, min, max, count
   - Arithmetic: add, subtract, multiply, divide (two values)
   - Percentages: percentage, pct_change
-  - Lookup: find value in column A where column B meets condition
-  - Ask specific questions → get direct answers back
-  - Example: "Using sales_data, answer: What is the total revenue? What is the average order value? What date had the highest sales?"
+  - Lookup: find value where condition met
+  - Example: "Using sales_data, answer: What is the total revenue? What is the average order value?"
   
-• Extraction - Extracts specific values from variables
+• Transform - Modifies data and stores in new variables
+  - Filter & Sort: filter by condition, sort ascending/descending
+  - Rolling: rolling average, rolling sum, running total, lag, lead
+  - Ranking: rank, top N, bottom N, percentile
+  - Grouping: sum/avg/count by category
+  - Normalization: scale 0-1, z-score, percent of total
+  - Example: "Using traffic_data, calculate 7-day rolling average of sessions. Store in smoothed_traffic."
+  
+• Extraction - Extracts specific values (stores in variable)
   - Finds specific items (like an ID from a list)
-  - Stores the extracted value in a new variable
   - Use: "Extract X from Y. Store in Z."
 
 ### Display Tools (use via EXECUTOR:)
@@ -6176,6 +6193,397 @@ function executeDivideColumns(outputVar: string, var1: string, col1: string, var
 }
 
 // ================================================================================
+// WINDOW/ROLLING OPERATIONS (return arrays, stored in variable)
+// ================================================================================
+
+function executeRollingAvg(outputVar: string, varName: string, colName: string, windowSize: number, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const nums = toNumbers(data);
+  const result: number[] = [];
+  
+  for (let i = 0; i < nums.length; i++) {
+    if (i < windowSize - 1) {
+      // Not enough data points yet - use available data
+      const slice = nums.slice(0, i + 1);
+      const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
+      result.push(Math.round(avg * 100) / 100);
+    } else {
+      const slice = nums.slice(i - windowSize + 1, i + 1);
+      const avg = slice.reduce((a, b) => a + b, 0) / windowSize;
+      result.push(Math.round(avg * 100) / 100);
+    }
+  }
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: result });
+  return { success: true, count: result.length };
+}
+
+function executeRollingSum(outputVar: string, varName: string, colName: string, windowSize: number, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const nums = toNumbers(data);
+  const result: number[] = [];
+  
+  for (let i = 0; i < nums.length; i++) {
+    if (i < windowSize - 1) {
+      const slice = nums.slice(0, i + 1);
+      result.push(Math.round(slice.reduce((a, b) => a + b, 0) * 100) / 100);
+    } else {
+      const slice = nums.slice(i - windowSize + 1, i + 1);
+      result.push(Math.round(slice.reduce((a, b) => a + b, 0) * 100) / 100);
+    }
+  }
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: result });
+  return { success: true, count: result.length };
+}
+
+function executeCumsum(outputVar: string, varName: string, colName: string, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const nums = toNumbers(data);
+  const result: number[] = [];
+  let runningTotal = 0;
+  
+  for (const num of nums) {
+    runningTotal += num;
+    result.push(Math.round(runningTotal * 100) / 100);
+  }
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: result });
+  return { success: true, count: result.length };
+}
+
+function executeLag(outputVar: string, varName: string, colName: string, periods: number, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const result: any[] = [];
+  for (let i = 0; i < data.length; i++) {
+    if (i < periods) {
+      result.push(null);
+    } else {
+      result.push(data[i - periods]);
+    }
+  }
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: result });
+  return { success: true, count: result.length };
+}
+
+function executeLead(outputVar: string, varName: string, colName: string, periods: number, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const result: any[] = [];
+  for (let i = 0; i < data.length; i++) {
+    if (i + periods >= data.length) {
+      result.push(null);
+    } else {
+      result.push(data[i + periods]);
+    }
+  }
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: result });
+  return { success: true, count: result.length };
+}
+
+// ================================================================================
+// RANKING OPERATIONS (return arrays, stored in variable)
+// ================================================================================
+
+function executeRank(outputVar: string, varName: string, colName: string, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const nums = toNumbers(data);
+  // Create array of {value, originalIndex}
+  const indexed = nums.map((v, i) => ({ value: v, index: i }));
+  // Sort by value descending (highest = rank 1)
+  indexed.sort((a, b) => b.value - a.value);
+  
+  // Assign ranks (1-based, with gaps for ties)
+  const ranks = new Array(nums.length);
+  let currentRank = 1;
+  for (let i = 0; i < indexed.length; i++) {
+    if (i > 0 && indexed[i].value === indexed[i - 1].value) {
+      ranks[indexed[i].index] = ranks[indexed[i - 1].index];
+    } else {
+      ranks[indexed[i].index] = currentRank;
+    }
+    currentRank++;
+  }
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: ranks });
+  return { success: true, count: ranks.length };
+}
+
+function executeDenseRank(outputVar: string, varName: string, colName: string, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const nums = toNumbers(data);
+  const indexed = nums.map((v, i) => ({ value: v, index: i }));
+  indexed.sort((a, b) => b.value - a.value);
+  
+  // Assign dense ranks (no gaps for ties)
+  const ranks = new Array(nums.length);
+  let currentRank = 1;
+  for (let i = 0; i < indexed.length; i++) {
+    if (i > 0 && indexed[i].value !== indexed[i - 1].value) {
+      currentRank++;
+    }
+    ranks[indexed[i].index] = currentRank;
+  }
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: ranks });
+  return { success: true, count: ranks.length };
+}
+
+function executeTopN(outputVar: string, varName: string, colName: string, n: number, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const nums = toNumbers(data);
+  // Sort descending and take top N
+  const sorted = [...nums].sort((a, b) => b - a);
+  const topN = sorted.slice(0, Math.min(n, sorted.length));
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: topN });
+  return { success: true, count: topN.length };
+}
+
+function executeBottomN(outputVar: string, varName: string, colName: string, n: number, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const nums = toNumbers(data);
+  // Sort ascending and take bottom N
+  const sorted = [...nums].sort((a, b) => a - b);
+  const bottomN = sorted.slice(0, Math.min(n, sorted.length));
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: bottomN });
+  return { success: true, count: bottomN.length };
+}
+
+function executePercentileRank(outputVar: string, varName: string, colName: string, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const nums = toNumbers(data);
+  const sorted = [...nums].sort((a, b) => a - b);
+  
+  const result = nums.map(value => {
+    const countBelow = sorted.filter(v => v < value).length;
+    const percentile = Math.round((countBelow / (nums.length - 1)) * 10000) / 100;
+    return Math.min(100, Math.max(0, percentile));
+  });
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: result });
+  return { success: true, count: result.length };
+}
+
+// ================================================================================
+// GROUPING OPERATIONS (return arrays, stored in variable)
+// ================================================================================
+
+function executeGroupSum(outputVar: string, valueVar: string, valueCol: string, groupVar: string, groupCol: string, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const values = getColumnData(valueVar, valueCol, pilotVariables);
+  const groups = getColumnData(groupVar, groupCol, pilotVariables);
+  
+  if (!values) return { success: false, error: `Column ${valueVar}[${valueCol}] not found` };
+  if (!groups) return { success: false, error: `Column ${groupVar}[${groupCol}] not found` };
+  
+  const nums = toNumbers(values);
+  const groupMap = new Map<string, number>();
+  
+  for (let i = 0; i < Math.min(nums.length, groups.length); i++) {
+    const groupKey = String(groups[i]);
+    groupMap.set(groupKey, (groupMap.get(groupKey) || 0) + nums[i]);
+  }
+  
+  // Store as table with group and sum columns
+  const rows = Array.from(groupMap.entries()).map(([group, sum]) => ({
+    group,
+    sum: Math.round(sum * 100) / 100
+  }));
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'table', data: rows, columns: ['group', 'sum'] });
+  return { success: true, count: rows.length };
+}
+
+function executeGroupAvg(outputVar: string, valueVar: string, valueCol: string, groupVar: string, groupCol: string, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const values = getColumnData(valueVar, valueCol, pilotVariables);
+  const groups = getColumnData(groupVar, groupCol, pilotVariables);
+  
+  if (!values) return { success: false, error: `Column ${valueVar}[${valueCol}] not found` };
+  if (!groups) return { success: false, error: `Column ${groupVar}[${groupCol}] not found` };
+  
+  const nums = toNumbers(values);
+  const groupSums = new Map<string, number>();
+  const groupCounts = new Map<string, number>();
+  
+  for (let i = 0; i < Math.min(nums.length, groups.length); i++) {
+    const groupKey = String(groups[i]);
+    groupSums.set(groupKey, (groupSums.get(groupKey) || 0) + nums[i]);
+    groupCounts.set(groupKey, (groupCounts.get(groupKey) || 0) + 1);
+  }
+  
+  const rows = Array.from(groupSums.entries()).map(([group, sum]) => ({
+    group,
+    average: Math.round((sum / groupCounts.get(group)!) * 100) / 100
+  }));
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'table', data: rows, columns: ['group', 'average'] });
+  return { success: true, count: rows.length };
+}
+
+function executeGroupCount(outputVar: string, valueVar: string, valueCol: string, groupVar: string, groupCol: string, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const values = getColumnData(valueVar, valueCol, pilotVariables);
+  const groups = getColumnData(groupVar, groupCol, pilotVariables);
+  
+  if (!values) return { success: false, error: `Column ${valueVar}[${valueCol}] not found` };
+  if (!groups) return { success: false, error: `Column ${groupVar}[${groupCol}] not found` };
+  
+  const groupCounts = new Map<string, number>();
+  
+  for (let i = 0; i < Math.min(values.length, groups.length); i++) {
+    const groupKey = String(groups[i]);
+    groupCounts.set(groupKey, (groupCounts.get(groupKey) || 0) + 1);
+  }
+  
+  const rows = Array.from(groupCounts.entries()).map(([group, count]) => ({
+    group,
+    count
+  }));
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'table', data: rows, columns: ['group', 'count'] });
+  return { success: true, count: rows.length };
+}
+
+function executeGroupMax(outputVar: string, valueVar: string, valueCol: string, groupVar: string, groupCol: string, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const values = getColumnData(valueVar, valueCol, pilotVariables);
+  const groups = getColumnData(groupVar, groupCol, pilotVariables);
+  
+  if (!values) return { success: false, error: `Column ${valueVar}[${valueCol}] not found` };
+  if (!groups) return { success: false, error: `Column ${groupVar}[${groupCol}] not found` };
+  
+  const nums = toNumbers(values);
+  const groupMaxes = new Map<string, number>();
+  
+  for (let i = 0; i < Math.min(nums.length, groups.length); i++) {
+    const groupKey = String(groups[i]);
+    const current = groupMaxes.get(groupKey);
+    if (current === undefined || nums[i] > current) {
+      groupMaxes.set(groupKey, nums[i]);
+    }
+  }
+  
+  const rows = Array.from(groupMaxes.entries()).map(([group, max]) => ({
+    group,
+    max: Math.round(max * 100) / 100
+  }));
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'table', data: rows, columns: ['group', 'max'] });
+  return { success: true, count: rows.length };
+}
+
+function executeGroupMin(outputVar: string, valueVar: string, valueCol: string, groupVar: string, groupCol: string, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const values = getColumnData(valueVar, valueCol, pilotVariables);
+  const groups = getColumnData(groupVar, groupCol, pilotVariables);
+  
+  if (!values) return { success: false, error: `Column ${valueVar}[${valueCol}] not found` };
+  if (!groups) return { success: false, error: `Column ${groupVar}[${groupCol}] not found` };
+  
+  const nums = toNumbers(values);
+  const groupMins = new Map<string, number>();
+  
+  for (let i = 0; i < Math.min(nums.length, groups.length); i++) {
+    const groupKey = String(groups[i]);
+    const current = groupMins.get(groupKey);
+    if (current === undefined || nums[i] < current) {
+      groupMins.set(groupKey, nums[i]);
+    }
+  }
+  
+  const rows = Array.from(groupMins.entries()).map(([group, min]) => ({
+    group,
+    min: Math.round(min * 100) / 100
+  }));
+  
+  analysisVariables.set(outputVar, { name: outputVar, type: 'table', data: rows, columns: ['group', 'min'] });
+  return { success: true, count: rows.length };
+}
+
+// ================================================================================
+// NORMALIZATION OPERATIONS (return arrays, stored in variable)
+// ================================================================================
+
+function executeNormalize(outputVar: string, varName: string, colName: string, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const nums = toNumbers(data);
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  const range = max - min;
+  
+  if (range === 0) {
+    // All values are the same
+    const result = nums.map(() => 0.5);
+    analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: result });
+    return { success: true, count: result.length };
+  }
+  
+  const result = nums.map(v => Math.round(((v - min) / range) * 10000) / 10000);
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: result });
+  return { success: true, count: result.length };
+}
+
+function executeStandardize(outputVar: string, varName: string, colName: string, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const nums = toNumbers(data);
+  const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+  const squaredDiffs = nums.map(v => Math.pow(v - mean, 2));
+  const variance = squaredDiffs.reduce((a, b) => a + b, 0) / nums.length;
+  const stdDev = Math.sqrt(variance);
+  
+  if (stdDev === 0) {
+    const result = nums.map(() => 0);
+    analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: result });
+    return { success: true, count: result.length };
+  }
+  
+  const result = nums.map(v => Math.round(((v - mean) / stdDev) * 10000) / 10000);
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: result });
+  return { success: true, count: result.length };
+}
+
+function executePercentOfTotal(outputVar: string, varName: string, colName: string, pilotVariables: Map<string, any>): { success: boolean; count?: number; error?: string } {
+  const data = getColumnData(varName, colName, pilotVariables);
+  if (!data) return { success: false, error: `Column ${varName}[${colName}] not found` };
+  
+  const nums = toNumbers(data);
+  const total = nums.reduce((a, b) => a + b, 0);
+  
+  if (total === 0) {
+    const result = nums.map(() => 0);
+    analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: result });
+    return { success: true, count: result.length };
+  }
+  
+  const result = nums.map(v => Math.round((v / total) * 10000) / 100);
+  analysisVariables.set(outputVar, { name: outputVar, type: 'column', data: result });
+  return { success: true, count: result.length };
+}
+
+// ================================================================================
 // TABLE CREATION OPERATION
 // ================================================================================
 
@@ -6380,6 +6788,79 @@ function parseAnalysisOperation(executeBlock: string): ParsedOperation | null {
     // Sort
     case 'sort_asc':
     case 'sort_desc': {
+      const ref = parseVarRef(argsStr);
+      if (!ref) return null;
+      return { type: opName.toLowerCase(), outputVar, args: { var1: ref.varName, col1: ref.colName } };
+    }
+    
+    // Window/Rolling operations
+    case 'rolling_avg':
+    case 'rolling_sum': {
+      // Pattern: rolling_avg(data[col], window_size)
+      const match = argsStr.match(/([a-zA-Z_][a-zA-Z0-9_]*)\[([a-zA-Z_][a-zA-Z0-9_]*)\]\s*,\s*(\d+)/);
+      if (match) {
+        return { type: opName.toLowerCase(), outputVar, args: { var1: match[1], col1: match[2], num: parseInt(match[3]) } };
+      }
+      return null;
+    }
+    
+    case 'cumsum': {
+      const ref = parseVarRef(argsStr);
+      if (!ref) return null;
+      return { type: 'cumsum', outputVar, args: { var1: ref.varName, col1: ref.colName } };
+    }
+    
+    case 'lag':
+    case 'lead': {
+      // Pattern: lag(data[col], periods)
+      const match = argsStr.match(/([a-zA-Z_][a-zA-Z0-9_]*)\[([a-zA-Z_][a-zA-Z0-9_]*)\]\s*,\s*(\d+)/);
+      if (match) {
+        return { type: opName.toLowerCase(), outputVar, args: { var1: match[1], col1: match[2], num: parseInt(match[3]) } };
+      }
+      return null;
+    }
+    
+    // Ranking operations
+    case 'rank':
+    case 'dense_rank':
+    case 'percentile_rank': {
+      const ref = parseVarRef(argsStr);
+      if (!ref) return null;
+      return { type: opName.toLowerCase(), outputVar, args: { var1: ref.varName, col1: ref.colName } };
+    }
+    
+    case 'top_n':
+    case 'bottom_n': {
+      // Pattern: top_n(data[col], n)
+      const match = argsStr.match(/([a-zA-Z_][a-zA-Z0-9_]*)\[([a-zA-Z_][a-zA-Z0-9_]*)\]\s*,\s*(\d+)/);
+      if (match) {
+        return { type: opName.toLowerCase(), outputVar, args: { var1: match[1], col1: match[2], num: parseInt(match[3]) } };
+      }
+      return null;
+    }
+    
+    // Grouping operations
+    case 'group_sum':
+    case 'group_avg':
+    case 'group_count':
+    case 'group_max':
+    case 'group_min': {
+      // Pattern: group_sum(data[value_col], by: data[group_col])
+      const match = argsStr.match(/([a-zA-Z_][a-zA-Z0-9_]*)\[([a-zA-Z_][a-zA-Z0-9_]*)\]\s*,\s*(?:by:\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\[([a-zA-Z_][a-zA-Z0-9_]*)\]/);
+      if (match) {
+        return { 
+          type: opName.toLowerCase(), 
+          outputVar, 
+          args: { var1: match[1], col1: match[2], var2: match[3], col2: match[4] } 
+        };
+      }
+      return null;
+    }
+    
+    // Normalization operations
+    case 'normalize':
+    case 'standardize':
+    case 'percent_of_total': {
       const ref = parseVarRef(argsStr);
       if (!ref) return null;
       return { type: opName.toLowerCase(), outputVar, args: { var1: ref.varName, col1: ref.colName } };
@@ -6753,6 +7234,104 @@ function executeAnalysisOperation(parsed: ParsedOperation, pilotVariables: Map<s
       if (!outputVar) return 'Error: sort_desc requires output variable';
       const result = executeSortDesc(outputVar, args.var1!, args.col1!, pilotVariables);
       return result.success ? `Stored in '${outputVar}' (${result.count} values)` : `Error: ${result.error}`;
+    }
+    
+    // Window/Rolling operations
+    case 'rolling_avg': {
+      if (!outputVar) return 'Error: rolling_avg requires output variable';
+      const result = executeRollingAvg(outputVar, args.var1!, args.col1!, args.num!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - rolling average with window ${args.num}` : `Error: ${result.error}`;
+    }
+    case 'rolling_sum': {
+      if (!outputVar) return 'Error: rolling_sum requires output variable';
+      const result = executeRollingSum(outputVar, args.var1!, args.col1!, args.num!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - rolling sum with window ${args.num}` : `Error: ${result.error}`;
+    }
+    case 'cumsum': {
+      if (!outputVar) return 'Error: cumsum requires output variable';
+      const result = executeCumsum(outputVar, args.var1!, args.col1!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - cumulative sum (running total)` : `Error: ${result.error}`;
+    }
+    case 'lag': {
+      if (!outputVar) return 'Error: lag requires output variable';
+      const result = executeLag(outputVar, args.var1!, args.col1!, args.num!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - lagged by ${args.num} period(s)` : `Error: ${result.error}`;
+    }
+    case 'lead': {
+      if (!outputVar) return 'Error: lead requires output variable';
+      const result = executeLead(outputVar, args.var1!, args.col1!, args.num!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - lead by ${args.num} period(s)` : `Error: ${result.error}`;
+    }
+    
+    // Ranking operations
+    case 'rank': {
+      if (!outputVar) return 'Error: rank requires output variable';
+      const result = executeRank(outputVar, args.var1!, args.col1!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - ranks (1 = highest)` : `Error: ${result.error}`;
+    }
+    case 'dense_rank': {
+      if (!outputVar) return 'Error: dense_rank requires output variable';
+      const result = executeDenseRank(outputVar, args.var1!, args.col1!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - dense ranks (no gaps)` : `Error: ${result.error}`;
+    }
+    case 'top_n': {
+      if (!outputVar) return 'Error: top_n requires output variable';
+      const result = executeTopN(outputVar, args.var1!, args.col1!, args.num!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - top ${args.num}` : `Error: ${result.error}`;
+    }
+    case 'bottom_n': {
+      if (!outputVar) return 'Error: bottom_n requires output variable';
+      const result = executeBottomN(outputVar, args.var1!, args.col1!, args.num!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - bottom ${args.num}` : `Error: ${result.error}`;
+    }
+    case 'percentile_rank': {
+      if (!outputVar) return 'Error: percentile_rank requires output variable';
+      const result = executePercentileRank(outputVar, args.var1!, args.col1!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - percentile ranks (0-100)` : `Error: ${result.error}`;
+    }
+    
+    // Grouping operations
+    case 'group_sum': {
+      if (!outputVar) return 'Error: group_sum requires output variable';
+      const result = executeGroupSum(outputVar, args.var1!, args.col1!, args.var2!, args.col2!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} groups) - sum by group` : `Error: ${result.error}`;
+    }
+    case 'group_avg': {
+      if (!outputVar) return 'Error: group_avg requires output variable';
+      const result = executeGroupAvg(outputVar, args.var1!, args.col1!, args.var2!, args.col2!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} groups) - average by group` : `Error: ${result.error}`;
+    }
+    case 'group_count': {
+      if (!outputVar) return 'Error: group_count requires output variable';
+      const result = executeGroupCount(outputVar, args.var1!, args.col1!, args.var2!, args.col2!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} groups) - count by group` : `Error: ${result.error}`;
+    }
+    case 'group_max': {
+      if (!outputVar) return 'Error: group_max requires output variable';
+      const result = executeGroupMax(outputVar, args.var1!, args.col1!, args.var2!, args.col2!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} groups) - max by group` : `Error: ${result.error}`;
+    }
+    case 'group_min': {
+      if (!outputVar) return 'Error: group_min requires output variable';
+      const result = executeGroupMin(outputVar, args.var1!, args.col1!, args.var2!, args.col2!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} groups) - min by group` : `Error: ${result.error}`;
+    }
+    
+    // Normalization operations
+    case 'normalize': {
+      if (!outputVar) return 'Error: normalize requires output variable';
+      const result = executeNormalize(outputVar, args.var1!, args.col1!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - normalized to 0-1 range` : `Error: ${result.error}`;
+    }
+    case 'standardize': {
+      if (!outputVar) return 'Error: standardize requires output variable';
+      const result = executeStandardize(outputVar, args.var1!, args.col1!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - z-scores (mean=0, std=1)` : `Error: ${result.error}`;
+    }
+    case 'percent_of_total': {
+      if (!outputVar) return 'Error: percent_of_total requires output variable';
+      const result = executePercentOfTotal(outputVar, args.var1!, args.col1!, pilotVariables);
+      return result.success ? `Stored in '${outputVar}' (${result.count} values) - each value as % of total` : `Error: ${result.error}`;
     }
     
     // Arithmetic with number
@@ -7641,6 +8220,242 @@ async function runDataCompute(
   
   // Return answers directly (no parsing, no modification)
   return { answers: answerOutput };
+}
+
+// ================================================================================
+// DATA TRANSFORM - Transforms data and stores in variables
+// ================================================================================
+
+// Build the Transform Execution Planner prompt (only column-returning operations)
+function buildTransformPlannerPrompt(
+  tablePreviews: string,
+  transformRequest: string
+): string {
+  return `# TRANSFORM EXECUTION PLANNER
+
+You plan data transformation operations. You see schemas and samples, not raw data.
+Write ALL operations needed, one per line. Add a comment after each to explain what it stores.
+
+================================================================================
+## AVAILABLE DATA
+================================================================================
+
+${tablePreviews}
+
+================================================================================
+## TRANSFORM REQUEST
+================================================================================
+
+${transformRequest}
+
+================================================================================
+## OPERATIONS REFERENCE (All return columns/tables, stored in variables)
+================================================================================
+
+### Filtering & Sorting
+variable: filter(data[column], "> 100")     # Rows matching condition (>, <, >=, <=, ==, !=)
+variable: sort_asc(data[column])            # Sorted ascending
+variable: sort_desc(data[column])           # Sorted descending
+
+### Window/Rolling Operations
+variable: rolling_avg(data[column], 7)      # 7-period moving average
+variable: rolling_sum(data[column], 7)      # 7-period moving sum
+variable: cumsum(data[column])              # Cumulative sum (running total)
+variable: lag(data[column], 1)              # Previous period's value (shift back)
+variable: lead(data[column], 1)             # Next period's value (shift forward)
+
+### Ranking Operations
+variable: rank(data[column])                # Rank values (1=highest, with gaps for ties)
+variable: dense_rank(data[column])          # Rank values (no gaps for ties)
+variable: top_n(data[column], 10)           # Top N highest values
+variable: bottom_n(data[column], 10)        # Bottom N lowest values
+variable: percentile_rank(data[column])     # Percentile rank (0-100)
+
+### Grouping & Aggregation (returns table with group + value columns)
+variable: group_sum(data[value], data[category])    # Sum by category
+variable: group_avg(data[value], data[category])    # Average by category
+variable: group_count(data[value], data[category])  # Count by category
+variable: group_max(data[value], data[category])    # Max by category
+variable: group_min(data[value], data[category])    # Min by category
+
+### Normalization
+variable: normalize(data[column])           # Scale to 0-1 range
+variable: standardize(data[column])         # Z-score (mean=0, std=1)
+variable: percent_of_total(data[column])    # Each value as % of total
+
+### Column Arithmetic
+variable: add(data[column], 10)                    # Add number to each value
+variable: subtract(data[column], 5)                # Subtract number from each
+variable: multiply(data[column], 2)                # Multiply each by number
+variable: divide(data[column], 2)                  # Divide each by number
+variable: add(data1[col1], data2[col2])            # Add two columns element-wise
+variable: subtract(data1[col1], data2[col2])       # Subtract two columns
+
+================================================================================
+## VARIABLE NAMING
+================================================================================
+
+Use DESCRIPTIVE and UNIQUE names that describe the transformed data:
+✓ high_traffic_days, rolling_7day_avg, sales_by_region, percentile_ranks
+✗ result, data, temp, var1
+
+================================================================================
+## OUTPUT FORMAT
+================================================================================
+
+Write operations one per line. Add # comment explaining what the variable contains.
+
+EXAMPLE:
+\`\`\`
+rolling_avg_sessions: rolling_avg(traffic[sessions], 7)     # 7-day moving average of sessions
+session_ranks: rank(traffic[sessions])                       # Rank of each day by sessions
+sales_by_region: group_sum(orders[revenue], orders[region])  # Total revenue per region
+top_10_days: top_n(traffic[sessions], 10)                   # Top 10 highest traffic days
+\`\`\`
+
+================================================================================
+
+Write your operations now. One per line with # comment:`;
+}
+
+// Run Data Transform - executes operations and returns variable names + descriptions
+async function runDataTransform(
+  dataRefs: string[],
+  transformRequest: string,
+  pilotVariables: Map<string, any>,
+  model: string,
+  sendEvent: (data: any) => void
+): Promise<{ result: string; newVariables: string[]; error?: string }> {
+  const client = createOpenRouterClient();
+  const newVariables: string[] = [];
+  
+  // Reset analysis variables for this transform
+  resetAnalysisVariables();
+  
+  // Build table previews
+  let tablePreviews = '';
+  const referencedVars: string[] = [];
+  
+  for (const ref of dataRefs) {
+    const varName = ref.includes('[') ? ref.split('[')[0] : ref;
+    if (!referencedVars.includes(varName)) {
+      referencedVars.push(varName);
+    }
+  }
+  
+  for (const varName of referencedVars) {
+    const pilotVar = pilotVariables.get(varName);
+    if (pilotVar) {
+      tablePreviews += buildTablePreview(varName, pilotVar) + '\n\n';
+    }
+  }
+  
+  console.log(`\n${'═'.repeat(80)}`);
+  console.log(`🔄 DATA TRANSFORM`);
+  console.log(`${'═'.repeat(80)}`);
+  console.log(`Request: ${transformRequest}`);
+  console.log(`Variables: ${referencedVars.join(', ')}`);
+  
+  sendEvent({ type: 'transform_started', request: transformRequest, variables: referencedVars });
+  
+  // ==========================================
+  // TOOL 1: Transform Execution Planner
+  // ==========================================
+  console.log(`\n${'─'.repeat(40)}`);
+  console.log(`📋 TOOL 1: TRANSFORM PLANNER`);
+  console.log(`${'─'.repeat(40)}`);
+  
+  sendEvent({ type: 'transform_phase', phase: 'planning' });
+  
+  const plannerPrompt = buildTransformPlannerPrompt(tablePreviews, transformRequest);
+  
+  let plannerOutput = '';
+  try {
+    const plannerResponse = await retryLLMCall(
+      () => client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: plannerPrompt },
+          { role: 'user', content: 'Write your operations now:' }
+        ],
+        temperature: 0.3
+      }),
+      (res) => res.choices[0]?.message?.content || '',
+      'Transform Planner'
+    );
+    plannerOutput = plannerResponse.choices[0]?.message?.content || '';
+  } catch (error: any) {
+    console.error(`[Transform Planner] Error:`, error.message);
+    return { result: '', newVariables, error: error.message };
+  }
+  
+  console.log(`\n📝 PLANNER OUTPUT:\n${plannerOutput}\n`);
+  
+  sendEvent({ type: 'transform_step', step: plannerOutput });
+  
+  // Parse operations
+  const operations = parseExecutionPlan(plannerOutput);
+  console.log(`\n✅ Parsed ${operations.length} operations`);
+  
+  if (operations.length === 0) {
+    return { result: 'No transform operations could be parsed', newVariables, error: 'No operations' };
+  }
+  
+  // ==========================================
+  // Execute Operations
+  // ==========================================
+  console.log(`\n${'─'.repeat(40)}`);
+  console.log(`⚙️ EXECUTING TRANSFORM OPERATIONS`);
+  console.log(`${'─'.repeat(40)}`);
+  
+  sendEvent({ type: 'transform_phase', phase: 'executing' });
+  
+  const results = await executeExecutionPlan(operations, pilotVariables, sendEvent);
+  
+  console.log(`\n✅ Executed ${results.length} operations`);
+  
+  // Build result summary - variable names and descriptions directly
+  const resultLines: string[] = [];
+  
+  for (const r of results) {
+    if (r.error) {
+      console.log(`   ❌ ${r.varName}: ${r.error}`);
+      resultLines.push(`❌ ${r.varName}: Error - ${r.error}`);
+    } else if (r.resultType === 'column') {
+      console.log(`   📦 ${r.varName} (${r.count} values) - ${r.comment || 'transformed data'}`);
+      newVariables.push(r.varName);
+      resultLines.push(`✅ Created '${r.varName}' (${r.count} values) - ${r.comment || 'transformed data'}`);
+    } else if (r.resultType === 'table') {
+      console.log(`   📋 ${r.varName} (${r.count} rows) - ${r.comment || 'transformed table'}`);
+      newVariables.push(r.varName);
+      resultLines.push(`✅ Created '${r.varName}' (${r.count} rows) - ${r.comment || 'transformed table'}`);
+    } else if (r.resultType === 'number') {
+      // Numbers shouldn't happen in transform, but handle gracefully
+      console.log(`   📊 ${r.varName} = ${r.value}`);
+      resultLines.push(`✅ Computed '${r.varName}' = ${r.value}`);
+    }
+  }
+  
+  // Build available fields for each new variable
+  for (const varName of newVariables) {
+    const analysisVar = analysisVariables.get(varName);
+    if (analysisVar && analysisVar.type === 'column') {
+      resultLines.push(`   Available: ${varName}[value]`);
+    }
+  }
+  
+  const resultStr = resultLines.join('\n');
+  
+  console.log(`\n${'═'.repeat(80)}`);
+  console.log(`📤 TRANSFORM RESULT (Direct to Pilot)`);
+  console.log(`${'═'.repeat(80)}`);
+  console.log(resultStr);
+  console.log(`${'═'.repeat(80)}\n`);
+  
+  sendEvent({ type: 'transform_complete', variables: newVariables, result: resultStr.slice(0, 300) });
+  
+  // Return result directly (no Answer Writer, no rephrasing)
+  return { result: resultStr, newVariables };
 }
 
 // ================================================================================
@@ -9568,9 +10383,10 @@ You are a Query Orchestrator. Your job is to take a user's request and create a 
 ${toolSummaries}
 
 ### Processing Tools (via DATA Agent)
-• compute - Runs calculations on data variables and answers specific questions.
-  The Pilot asks specific questions → gets direct answers back.
+• compute - Runs calculations and answers specific questions. Returns values directly.
   Operations: sum, average, min, max, count, add, subtract, multiply, divide, percentage, pct_change, lookup.
+• transform - Transforms data and stores in new variables.
+  Operations: filter, sort, rolling avg/sum, cumsum, lag/lead, rank, top/bottom N, group by, normalize, standardize, percent of total.
 • extractor - Extract specific values from data (e.g., find a specific ID from a list). Stores result in a variable.
 
 ### Display Tools
@@ -9872,7 +10688,7 @@ function cleanPilotOutput(rawOutput: string): { tag: 'EXECUTOR' | 'DATA' | 'REPL
 }
 
 // ================================================================================
-// DATA AGENT - Handles computation (compute) and extraction (extractor) tools
+// DATA AGENT - Handles compute, transform, and extractor tools
 // ================================================================================
 
 // Build the Data Agent's system prompt (similar to Executor)
@@ -9882,7 +10698,7 @@ function buildDataAgentPrompt(
 ): string {
   return `# DATA AGENT
 
-You translate the Pilot's natural language instructions into actual tool calls for data computation and extraction.
+You translate the Pilot's natural language instructions into actual tool calls for data computation, transformation, and extraction.
 
 ================================================================================
 ## TASK FROM PILOT (Natural Language)
@@ -9894,32 +10710,46 @@ ${task}
 ## YOUR JOB
 ================================================================================
 
-1. Understand what the Pilot wants (they ask specific questions in natural language)
+1. Understand what the Pilot wants (they ask in natural language)
 2. Translate it into the proper tool call syntax
 3. Figure out which variables to use
-4. Execute ONE tool call (either compute or extractor)
+4. Execute ONE tool call (compute, transform, or extractor)
 
 The Pilot says things like:
-- "Extract the property ID for vibefam from the properties data. Store in prop_id." → You write: prop_id: extractor(data: [properties[display_name], properties[property_id]], extract: "find the property_id for vibefam")
-- "Using october_traffic and november_traffic, answer: What is the total sessions for October? What is the total for November? What is the percentage change?" → You write: compute(data: [october_traffic, november_traffic], questions: "What is the total sessions for October? What is the total for November? What is the percentage change?")
+- "Using october_traffic and november_traffic, answer: What is the total sessions? Store in traffic_totals." → compute
+- "Filter traffic data where sessions > 500. Store in high_traffic_days." → transform
+- "Extract the property ID for vibefam from the properties data. Store in prop_id." → extractor
 
 ================================================================================
 ## TOOL DOCUMENTATION
 ================================================================================
 
-### compute (Data Computation)
-Runs calculations on data variables and answers specific questions. Does NOT store in a variable - returns answers directly.
+### compute (Get Answers - returns answers AND stores in variable)
+Runs calculations and answers specific questions. Returns answers directly AND stores in a variable for later reference.
 
 Syntax:
-\`compute(data: [var1, var2, ...], questions: "specific questions to answer")\`
+\`variable_name: compute(data: [var1, var2, ...], questions: "specific questions to answer")\`
+
+Operations: sum, average, max, min, count, add, subtract, multiply, divide, percentage, pct_change, lookup
 
 Example:
-\`compute(data: [october_traffic, november_traffic], questions: "What is the total sessions for October? What is the total sessions for November? What is the percentage change?")\`
+\`oct_nov_comparison: compute(data: [october_traffic, november_traffic], questions: "What is total sessions for October? What is the percentage change?")\`
 
-The compute tool can: sum, average, max, min, count, compare, percentages, percentage change, filter, sort, group by, correlations, rankings.
+Note: ALWAYS include a descriptive variable name. The Pilot will receive the answers directly AND can reference the variable later.
 
-### extractor (Value Extraction)
-Extracts specific values from data variables. Stores result in a variable.
+### transform (Modify Data - stores in variables)
+Transforms data and stores results in variables. Returns variable names and descriptions.
+
+Syntax:
+\`transform(data: [var1, var2, ...], operations: "what transformations to perform")\`
+
+Operations: filter, sort_asc, sort_desc, add/subtract/multiply/divide columns
+
+Example:
+\`transform(data: [traffic_data], operations: "Filter rows where sessions > 500. Store in high_traffic_days.")\`
+
+### extractor (Extract Value - stores in variable)
+Extracts specific values from data. Stores result in a variable.
 
 Syntax:
 \`variable_name: extractor(data: [var[field1], var[field2], ...], extract: "what to extract")\`
@@ -9940,8 +10770,11 @@ ${variablesContext || '(No variables yet)'}
 Access variable data:
 \`variable_name[field_name]\`
 
-For compute (answers questions, no variable storage):
-\`compute(data: [var1, var2], questions: "specific questions to answer")\`
+For compute (answers questions AND stores in variable):
+\`result_var: compute(data: [var1, var2], questions: "specific questions")\`
+
+For transform (transforms data, stores in variables):
+\`transform(data: [var1, var2], operations: "filter/sort/arithmetic operations")\`
 
 For extractor (stores result in variable):
 \`result: extractor(data: [var[field1], var[field2]], extract: "what to extract")\`
@@ -9994,7 +10827,7 @@ async function runDataAgent(
   sendEvent({
     type: 'data_agent_started',
     task: instructions.slice(0, 200),
-    tools: ['compute', 'extractor']
+    tools: ['compute', 'transform', 'extractor']
   });
   
   const systemPrompt = buildDataAgentPrompt(instructions, variablesContext);
@@ -10065,8 +10898,9 @@ async function runDataAgent(
     // ========================================================================
     
     if (call.toolName === 'compute') {
-      // Compute tool - runs calculations and returns answers directly (no variable storage)
+      // Compute tool - runs calculations and returns answers (optionally stores in variable)
       console.log(`\n[Data Agent] Executing COMPUTE tool`);
+      console.log(`[Data Agent] Variable name (optional): ${call.variableName || '(none - no storage)'}`);
       console.log(`[Data Agent] Args: ${JSON.stringify(call.args)}`);
       
       // Parse the data and questions from args
@@ -10099,7 +10933,8 @@ async function runDataAgent(
         type: 'data_agent_tool_calling',
         tool: 'compute',
         dataRefs: parsedRefs,
-        questions: questionsStr
+        questions: questionsStr,
+        storeIn: call.variableName || null
       });
       
       // Call the Data Computation system (returns answers, not report)
@@ -10120,14 +10955,37 @@ async function runDataAgent(
       console.log(`\n✅ COMPUTE COMPLETE - Answers returned directly`);
       console.log(`Answers: ${computeResult.answers.slice(0, 200)}...`);
       
-      sendEvent({
-        type: 'data_agent_tool_success',
-        tool: 'compute',
-        answers: computeResult.answers
-      });
-      
-      // Return answers directly to Pilot (no variable storage, no rephrasing)
-      report = computeResult.answers;
+      // If variable name provided, store answers in pilotVariables
+      if (call.variableName) {
+        variables.set(call.variableName, {
+          name: call.variableName,
+          schema: { value: { description: 'Computed answers text', data_type: 'string' } },
+          actualData: computeResult.answers,  // Store directly as string
+          description: `Computed answers for: ${questionsStr.slice(0, 100)}`
+        });
+        newVariables.push(call.variableName);
+        
+        console.log(`\n📦 Answers also stored in variable: ${call.variableName}`);
+        
+        sendEvent({
+          type: 'data_agent_tool_success',
+          tool: 'compute',
+          answers: computeResult.answers,
+          storedIn: call.variableName
+        });
+        
+        // Return answers AND mention storage
+        report = `${computeResult.answers}\n\n(Answers stored in '${call.variableName}' - use this variable name to reference these answers later)`;
+      } else {
+        sendEvent({
+          type: 'data_agent_tool_success',
+          tool: 'compute',
+          answers: computeResult.answers
+        });
+        
+        // Return answers directly to Pilot (no variable storage, no rephrasing)
+        report = computeResult.answers;
+      }
     }
     
     else if (call.toolName === 'extractor') {
@@ -10252,11 +11110,111 @@ If extracting multiple fields, return: {"field1": value1, "field2": value2, ...}
       }
     }
     
+    else if (call.toolName === 'transform') {
+      // Transform tool - modifies data and stores in variables
+      console.log(`\n[Data Agent] Executing TRANSFORM tool`);
+      console.log(`[Data Agent] Args: ${JSON.stringify(call.args)}`);
+      
+      // Parse the data and operations from args
+      let dataStr = '';
+      let operationsStr = '';
+      
+      if (typeof call.args === 'string') {
+        const dataMatch = call.args.match(/data:\s*\[([^\]]+)\]/);
+        if (dataMatch) dataStr = dataMatch[1];
+        const opsMatch = call.args.match(/operations:\s*["']([^"']+)["']/);
+        if (opsMatch) operationsStr = opsMatch[1];
+      } else if (typeof call.args === 'object') {
+        dataStr = String(call.args.data || '');
+        operationsStr = call.args.operations || call.args.operation || '';
+      }
+      
+      // Extract variable references
+      const parsedRefs: string[] = [];
+      const refMatches = dataStr.matchAll(/([a-zA-Z_][a-zA-Z0-9_]*(?:\[[a-zA-Z_][a-zA-Z0-9_]*\])?)/g);
+      for (const match of refMatches) {
+        if (match[1].includes('[') || variables.has(match[1])) {
+          parsedRefs.push(match[1]);
+        }
+      }
+      
+      console.log(`[Data Agent] Data refs: ${parsedRefs.join(', ')}`);
+      console.log(`[Data Agent] Operations: ${operationsStr}`);
+      
+      sendEvent({
+        type: 'data_agent_tool_calling',
+        tool: 'transform',
+        dataRefs: parsedRefs,
+        operations: operationsStr
+      });
+      
+      // Call the Data Transform system
+      const transformResult = await runDataTransform(
+        parsedRefs,
+        operationsStr || instructions,
+        variables,
+        model,
+        sendEvent
+      );
+      
+      if (transformResult.error) {
+        console.log(`\n❌ TRANSFORM ERROR: ${transformResult.error}`);
+        sendEvent({ type: 'data_agent_tool_error', tool: 'transform', error: transformResult.error });
+        return { success: false, report: `Transform failed: ${transformResult.error}`, newVariables };
+      }
+      
+      // Add newly created variables to our list AND copy to pilotVariables
+      for (const varName of transformResult.newVariables) {
+        if (!newVariables.includes(varName)) {
+          newVariables.push(varName);
+        }
+        
+        // Copy from analysisVariables to pilotVariables so Executor can access them
+        const analysisVar = analysisVariables.get(varName);
+        if (analysisVar) {
+          if (analysisVar.type === 'column') {
+            // Column type - store as array with 'value' field
+            variables.set(varName, {
+              name: varName,
+              schema: { value: { description: 'Transformed column data', data_type: 'array' } },
+              actualData: analysisVar.data.map((v: any) => ({ value: v })),
+              description: `Transformed data (${analysisVar.data.length} values)`
+            });
+          } else if (analysisVar.type === 'table') {
+            // Table type - store with columns from the table
+            const columns = analysisVar.columns || Object.keys(analysisVar.data[0] || {});
+            const schema: Record<string, any> = {};
+            for (const col of columns) {
+              schema[col] = { description: `Column: ${col}`, data_type: 'mixed' };
+            }
+            variables.set(varName, {
+              name: varName,
+              schema,
+              actualData: analysisVar.data,
+              description: `Transformed table (${analysisVar.data.length} rows)`
+            });
+          }
+        }
+      }
+      
+      console.log(`\n✅ TRANSFORM COMPLETE - Variables created: ${transformResult.newVariables.join(', ')}`);
+      
+      sendEvent({
+        type: 'data_agent_tool_success',
+        tool: 'transform',
+        variables: transformResult.newVariables,
+        result: transformResult.result
+      });
+      
+      // Return result directly to Pilot (variable names + descriptions, no rephrasing)
+      report = transformResult.result;
+    }
+    
     else {
       // Unknown tool
       console.log(`[Data Agent] ERROR: Unknown tool ${call.toolName}`);
       sendEvent({ type: 'data_agent_error', error: `Unknown tool: ${call.toolName}` });
-      return { success: false, report: `Unknown tool: ${call.toolName}. Use 'compute' for calculations or 'extractor' for extraction.`, newVariables };
+      return { success: false, report: `Unknown tool: ${call.toolName}. Use 'compute' for calculations, 'transform' for data transformations, or 'extractor' for extraction.`, newVariables };
     }
     
     return { success: true, report, newVariables };
