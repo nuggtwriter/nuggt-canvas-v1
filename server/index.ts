@@ -4228,19 +4228,27 @@ Tools available via EXECUTOR:
 - add_insight (to add your insights to reports)
 
 ### OPTION 2: Instruct the Data Agent
-Give ONE instruction IN NATURAL LANGUAGE for analysis or extraction.
+Give ONE instruction IN NATURAL LANGUAGE for computation or extraction.
 
 Format:
-DATA: <natural language description>
+DATA: <natural language questions about your data>
 
-For Analysis - specify: which variables, what to calculate, where to store
-For Extraction - specify: what to extract, from which variable, where to store
+For Computation (compute tool) - ASK SPECIFIC QUESTIONS:
+- Aggregations: sum, average, min, max, count
+- Arithmetic: add, subtract, multiply, divide (two values)
+- Percentages: percentage, pct_change
+- Lookup: find a value in one column where another column meets a condition
+- Ask specific questions - you'll get direct answers back
+- You can ask multiple questions at once
+
+For Extraction (extractor tool) - specify: what to extract, from which variable, where to store
 
 Examples:
-- "DATA: Analyze october_traffic and november_traffic. Calculate total sessions per month and percentage change. Store in traffic_comparison."
+- "DATA: Using october_traffic and november_traffic, answer: What is the total sessions for October? What is the total sessions for November? What is the percentage change?"
+- "DATA: Using daily_sales, answer: What is the total revenue? What is the average daily revenue? Which day had the highest sales?"
 - "DATA: Extract the property_id for 'vibefam' from the properties data. Store in prop_id."
 
-⚠️ Ask ONLY data questions (what, how much, how many) - NOT why questions!
+⚠️ Ask specific data questions (what, how much, how many, which) - NOT why questions (YOU interpret!)
 
 ### OPTION 3: Reply to User
 When you have completed the task and displayed results to the user.
@@ -4261,19 +4269,19 @@ Step 3: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for O
         (wait for result)
 Step 4: EXECUTOR: Use ga_daily_trend_report with the extracted property ID for November 2025. Store in november_traffic.
         (wait for result)
-Step 5: DATA: Analyze october_traffic and november_traffic. Calculate total sessions for each month, percentage change, and top 5 days by sessions. Store in traffic_comparison.
-        (wait - you receive detailed summary with all calculated values)
-Step 6: EXECUTOR: Add insight to traffic_comparison with title 'Why Traffic Declined' and insight 'The 15.4% drop in November likely reflects the end of Q3 marketing campaigns...'
-        (wait - insight added)
-Step 7: EXECUTOR: Display the traffic_comparison report to the user.
-        (wait - report displayed)
-Step 8: REPLY: Explain what's shown including your insight about the traffic decline.
+Step 5: DATA: Using october_traffic and november_traffic, answer: What is the total sessions for October? What is the total sessions for November? What is the percentage change? Which were the top 3 days by sessions in each month?
+        (wait - you receive answers: "October total: 15,234 sessions. November total: 12,890 sessions. Change: -15.4%. Top days: Oct 15 (892), Oct 22 (845)...")
+Step 6: Based on the answers, formulate YOUR interpretation and display it
+        EXECUTOR: Create a card titled 'Traffic Comparison' with the key findings and your insight about why traffic may have declined.
+        (wait - card displayed)
+Step 7: REPLY: Explain what you found including your insight about the traffic decline.
 
 WRONG:
 ❌ EXECUTOR: ga_list_properties() (use natural language, not syntax!)
 ❌ EXECUTOR: ga_daily_trend_report(property_id=...) (use natural language!)
-❌ EXECUTOR: Analyze the traffic data (use DATA: for analysis!)
+❌ EXECUTOR: Analyze the traffic data (use DATA: for computation!)
 ❌ DATA: Why did traffic decline? (YOU interpret the numbers!)
+❌ DATA: Analyze the data and create a report (ask specific questions!)
 
 Each instruction = ONE action. Wait for the result before the next step.
 
@@ -4288,7 +4296,7 @@ REPLY: <your response>
 IMPORTANT - Your REPLY should:
 - Explain what you did and your thought process
 - Describe what's displayed on the canvas (tables, charts) - user can see them!
-- Share insights the report tool provided (if any)
+- Share the insights you formulated based on the data
 - Suggest next steps or ask follow-up questions
 - Be conversational and helpful
 
@@ -4338,41 +4346,30 @@ BAD variable names:
 ### Data Tools (use via EXECUTOR:)
 ${toolSummaries}
 ### DATA Agent Tools (use via DATA:)
-• Analysis - Analyzes data in variables, calculates totals, averages, comparisons
-  - Returns a DETAILED SUMMARY with all calculated values
-  - Creates a report variable you can display later
-  - Use DATA: with "analyze" keyword
+• Compute - Runs calculations on data and answers your specific questions
+  - Aggregations: sum, average, min, max, count (on columns)
+  - Arithmetic: add, subtract, multiply, divide (two values)
+  - Percentages: percentage, pct_change
+  - Lookup: find value in column A where column B meets condition
+  - Ask specific questions → get direct answers back
+  - Example: "Using sales_data, answer: What is the total revenue? What is the average order value? What date had the highest sales?"
   
 • Extraction - Extracts specific values from variables
   - Finds specific items (like an ID from a list)
   - Stores the extracted value in a new variable
-  - Use DATA: with "extract" keyword
+  - Use: "Extract X from Y. Store in Z."
 
 ### Display Tools (use via EXECUTOR:)
-• add_insight - Add YOUR interpretation/insight to a report AFTER you see the summary
-  - YOU provide the insight text based on the summary data you received
-  - Specify: report variable, title, and your insight text
-  - Example: "EXECUTOR: Add insight to traffic_comparison with title 'Why Traffic Declined' and insight '...'"
-  
-  ⚠️ YOU must write the insight - don't ask the tool to generate it!
-
-• display_report - Display an analysis report to the user
-  - Takes a report variable and shows it on canvas
-  - Call AFTER adding your insights
-  - Example: "EXECUTOR: Display the traffic_comparison report to the user"
-
-• table - Display data as a table
-• line-chart - Display data as a line chart  
-• card - Display markdown content
+• table - Display data as a table (use variable references)
+• line-chart - Display data as a line chart (use variable references)
+• card - Display markdown content (for your insights and findings)
 • alert - Display an important notice
 
 ⚠️ IMPORTANT WORKFLOW:
-1. DATA: Analyze variables (calculations only) → you receive DETAILED SUMMARY with all values
-2. Review the summary - use the numbers to formulate YOUR insight
-3. EXECUTOR: Add YOUR insight → "Add insight to <variable> with title '...' and insight '...'"
-4. EXECUTOR: Display the report → "Display the <variable> to the user"
-5. Repeat for additional analyses
-6. REPLY: Explain to user what's displayed
+1. DATA: Ask specific questions about your variables → you receive direct answers
+2. Review the answers - use them to formulate YOUR insight
+3. EXECUTOR: Display your findings using card, table, or chart
+4. REPLY: Explain to user what you found
 
 ================================================================================
 ## ⚠️ STEP-BY-STEP EXECUTION RULES
@@ -4389,20 +4386,17 @@ ${toolSummaries}
 TYPICAL FLOW:
 1. EXECUTOR: Fetch data (ga_list_properties, etc.)
 2. DATA: Extract specific value if needed
-3. EXECUTOR: Use extracted value in next tool
-4. DATA: Analyze variables (calculations only)
-5. Review the detailed summary you receive
-6. EXECUTOR: Add YOUR insight using add_insight
-7. EXECUTOR: Display the report
-8. (Repeat 4-7 for each aspect of analysis)
-9. REPLY: Explain what's displayed
+3. EXECUTOR: Use extracted value in next tool to fetch more data
+4. DATA: Ask specific questions about your data variables
+5. Review the answers you receive
+6. EXECUTOR: Display your findings and insights using card/table/chart
+7. REPLY: Explain what you found
 
 Example for "Compare Q3 vs Q4 sales":
-- Step 4: DATA: Analyze q3_sales and q4_sales. Calculate totals and percentage change. Store in revenue_comparison.
-- Step 5: (see summary: "Q3: $45K, Q4: $54K, Change: +20%")
-- Step 6: EXECUTOR: Add insight to revenue_comparison with title "Why Q4 Outperformed" and insight "The 20% increase is driven by holiday shopping..."
-- Step 7: EXECUTOR: Display revenue_comparison
-- Step 8: REPLY: I've analyzed your Q3 vs Q4 sales...
+- Step 4: DATA: Using q3_sales and q4_sales, answer: What is the total revenue for Q3? What is the total revenue for Q4? What is the percentage change? Which products had the highest sales in each quarter?
+- Step 5: (receive answers: "Q3 total: $45,000. Q4 total: $54,000. Change: +20%. Top products: Widget A ($12K), Widget B ($8K)...")
+- Step 6: EXECUTOR: Create a card titled "Q3 vs Q4 Sales Analysis" with your findings and insight that the 20% increase may be driven by holiday shopping
+- Step 7: REPLY: I've analyzed your Q3 vs Q4 sales and found a 20% increase...
 
 ================================================================================
 ## GUIDELINES
@@ -4419,16 +4413,17 @@ Example for "Compare Q3 vs Q4 sales":
 ## ❌ DO NOT USE DATA: FOR THESE
 ================================================================================
 
-DATA: is STRICTLY for analyzing or extracting from DATA stored in VARIABLES.
+DATA: is STRICTLY for computing on or extracting from DATA stored in VARIABLES.
 
 DO NOT use DATA: for:
 - Date ranges or date formatting (you know how dates work)
 - Simple calculations or conversions
 - General knowledge questions
-- Anything that doesn't involve analyzing fetched data variables
+- Anything that doesn't involve your fetched data variables
 - Asking "why" questions (YOU interpret the numbers!)
+- Vague requests like "analyze the data" (ask specific questions!)
 
-ONLY use DATA: when you have actual data variables to analyze or extract from!
+ONLY use DATA: when you have actual data variables AND specific questions to answer!
 
 ================================================================================
 
@@ -4450,7 +4445,7 @@ function extractMentionedTools(instruction: string): string[] {
     }
   }
   
-  // Also check for built-in tools (report and extractor are handled by DATA AGENT, not Executor)
+  // Also check for built-in tools (compute and extractor are handled by DATA AGENT, not Executor)
   if (instructionLower.includes('add_insight') || instructionLower.includes('add insight') || instructionLower.includes('add an insight')) mentioned.push('add_insight');
   if (instructionLower.includes('display_report') || instructionLower.includes('display') && instructionLower.includes('report')) mentioned.push('display_report');
   if (instructionLower.includes('table')) mentioned.push('table');
@@ -4603,7 +4598,7 @@ Returns: Confirmation that table was displayed
 
 You can use:
 - Original data variables: daily_traffic[date], daily_traffic[sessions]
-- Analysis variables (from llm): nov_sessions, comparison_data
+- Analysis variables: nov_sessions, comparison_data
 
 Example with original data:
 \`table({column_name: "Date", data: daily_traffic[date]}, {column_name: "Sessions", data: daily_traffic[sessions]})\`
@@ -4623,7 +4618,7 @@ Returns: Confirmation that chart was displayed
 
 You can use:
 - Original data variables: daily_traffic[date], daily_traffic[sessions]
-- Analysis variables (from llm): sorted_sessions, filtered_data
+- Analysis variables: sorted_sessions, filtered_data
 
 Example:
 \`line-chart(x_data: daily_traffic[date], y_data: daily_traffic[sessions], x_label: "Date", y_label: "Sessions")\`
@@ -4659,7 +4654,7 @@ Returns: Confirmation that alert was displayed
     
     if (toolId === 'display_report') {
       result += `### display_report
-Display an analysis report on the canvas. Takes a report variable created by the llm tool.
+Display an analysis report on the canvas. Takes a report variable.
 
 Syntax: \`display_report(report_variable_name)\`
 
@@ -6294,6 +6289,16 @@ interface ParsedOperation {
     condition?: string;
     columns?: Array<{ label: string; dataRef: string }>;
     explicitData?: Array<{ label: string; values: any[] }>;
+    // For value arithmetic
+    val1?: string | number;
+    val2?: string | number;
+    isVal1Num?: boolean;
+    isVal2Num?: boolean;
+    // For lookup
+    returnVar?: string;
+    returnCol?: string;
+    matchVar?: string;
+    matchCol?: string;
   };
 }
 
@@ -6380,7 +6385,7 @@ function parseAnalysisOperation(executeBlock: string): ParsedOperation | null {
       return { type: opName.toLowerCase(), outputVar, args: { var1: ref.varName, col1: ref.colName } };
     }
     
-    // Arithmetic with number or column
+    // Arithmetic - can be: value+value, column+number, or column+column
     case 'add':
     case 'subtract':
     case 'multiply':
@@ -6401,9 +6406,28 @@ function parseAnalysisOperation(executeBlock: string): ParsedOperation | null {
       const firstArg = argsStr.slice(0, commaIdx).trim();
       const secondArg = argsStr.slice(commaIdx + 1).trim();
       
-      // Check if second arg is a number
-      const numMatch = secondArg.match(/^[\d.]+$/);
-      if (numMatch) {
+      // Check if both args are simple variables or numbers (value arithmetic)
+      const isFirstNum = /^[\d.-]+$/.test(firstArg);
+      const isSecondNum = /^[\d.-]+$/.test(secondArg);
+      const isFirstSimpleVar = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(firstArg) && !firstArg.includes('[');
+      const isSecondSimpleVar = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(secondArg) && !secondArg.includes('[');
+      
+      // If both are simple vars or numbers → value arithmetic
+      if ((isFirstSimpleVar || isFirstNum) && (isSecondSimpleVar || isSecondNum)) {
+        return { 
+          type: `${opName.toLowerCase()}_values`, 
+          outputVar, 
+          args: { 
+            val1: isFirstNum ? parseFloat(firstArg) : firstArg,
+            val2: isSecondNum ? parseFloat(secondArg) : secondArg,
+            isVal1Num: isFirstNum,
+            isVal2Num: isSecondNum
+          } 
+        };
+      }
+      
+      // Check if second arg is a number (column + number)
+      if (isSecondNum) {
         const ref1 = parseVarRef(firstArg);
         if (!ref1) return null;
         return { type: `${opName.toLowerCase()}_num`, outputVar, args: { var1: ref1.varName, col1: ref1.colName, num: parseFloat(secondArg) } };
@@ -6414,6 +6438,26 @@ function parseAnalysisOperation(executeBlock: string): ParsedOperation | null {
       const ref2 = parseVarRef(secondArg);
       if (!ref1 || !ref2) return null;
       return { type: `${opName.toLowerCase()}_columns`, outputVar, args: { var1: ref1.varName, col1: ref1.colName, var2: ref2.varName, col2: ref2.colName } };
+    }
+    
+    // Lookup - find value based on condition
+    case 'lookup': {
+      // Pattern: lookup(data[return_col], data[match_col], "condition")
+      const lookupMatch = argsStr.match(/([a-zA-Z_][a-zA-Z0-9_]*)\[([a-zA-Z_][a-zA-Z0-9_]*)\]\s*,\s*([a-zA-Z_][a-zA-Z0-9_]*)\[([a-zA-Z_][a-zA-Z0-9_]*)\]\s*,\s*["'](.+)["']/);
+      if (lookupMatch) {
+        return { 
+          type: 'lookup', 
+          outputVar, 
+          args: { 
+            returnVar: lookupMatch[1], 
+            returnCol: lookupMatch[2],
+            matchVar: lookupMatch[3], 
+            matchCol: lookupMatch[4], 
+            condition: lookupMatch[5] 
+          } 
+        };
+      }
+      return null;
     }
     
     // Table creation
@@ -6581,6 +6625,119 @@ function executeAnalysisOperation(parsed: ParsedOperation, pilotVariables: Map<s
       return `Result: ${change}%`;
     }
     
+    // Value arithmetic (value + value → value)
+    case 'add_values': {
+      const v1 = args.isVal1Num ? (args.val1 as number) : getStoredNumber(args.val1 as string);
+      const v2 = args.isVal2Num ? (args.val2 as number) : getStoredNumber(args.val2 as string);
+      if (v1 === null) return `Error: Variable '${args.val1}' not found or is not a number`;
+      if (v2 === null) return `Error: Variable '${args.val2}' not found or is not a number`;
+      const result = Math.round((v1 + v2) * 100) / 100;
+      return storeNumberResult(result, outputVar);
+    }
+    case 'subtract_values': {
+      const v1 = args.isVal1Num ? (args.val1 as number) : getStoredNumber(args.val1 as string);
+      const v2 = args.isVal2Num ? (args.val2 as number) : getStoredNumber(args.val2 as string);
+      if (v1 === null) return `Error: Variable '${args.val1}' not found or is not a number`;
+      if (v2 === null) return `Error: Variable '${args.val2}' not found or is not a number`;
+      const result = Math.round((v1 - v2) * 100) / 100;
+      return storeNumberResult(result, outputVar);
+    }
+    case 'multiply_values': {
+      const v1 = args.isVal1Num ? (args.val1 as number) : getStoredNumber(args.val1 as string);
+      const v2 = args.isVal2Num ? (args.val2 as number) : getStoredNumber(args.val2 as string);
+      if (v1 === null) return `Error: Variable '${args.val1}' not found or is not a number`;
+      if (v2 === null) return `Error: Variable '${args.val2}' not found or is not a number`;
+      const result = Math.round((v1 * v2) * 100) / 100;
+      return storeNumberResult(result, outputVar);
+    }
+    case 'divide_values': {
+      const v1 = args.isVal1Num ? (args.val1 as number) : getStoredNumber(args.val1 as string);
+      const v2 = args.isVal2Num ? (args.val2 as number) : getStoredNumber(args.val2 as string);
+      if (v1 === null) return `Error: Variable '${args.val1}' not found or is not a number`;
+      if (v2 === null) return `Error: Variable '${args.val2}' not found or is not a number`;
+      if (v2 === 0) return `Error: Cannot divide by zero`;
+      const result = Math.round((v1 / v2) * 100) / 100;
+      return storeNumberResult(result, outputVar);
+    }
+    
+    // Lookup - find value where condition is met
+    case 'lookup': {
+      const returnData = getColumnData(args.returnVar, args.returnCol, pilotVariables);
+      const matchData = getColumnData(args.matchVar, args.matchCol, pilotVariables);
+      
+      if (!returnData) return `Error: Variable '${args.returnVar}[${args.returnCol}]' not found`;
+      if (!matchData) return `Error: Variable '${args.matchVar}[${args.matchCol}]' not found`;
+      if (returnData.length !== matchData.length) return `Error: Column lengths don't match`;
+      
+      const condition = args.condition as string;
+      
+      // Parse condition: "== value", "> value", "< value", etc.
+      const condMatch = condition.match(/^(==|!=|>|<|>=|<=)\s*(.+)$/);
+      if (!condMatch) return `Error: Invalid condition format '${condition}'`;
+      
+      const [, operator, valueStr] = condMatch;
+      
+      // Get comparison value (could be a stored variable or a number)
+      let compareValue: number | string;
+      const storedNum = getStoredNumber(valueStr.trim());
+      if (storedNum !== null) {
+        compareValue = storedNum;
+      } else if (/^[\d.-]+$/.test(valueStr.trim())) {
+        compareValue = parseFloat(valueStr.trim());
+      } else {
+        compareValue = valueStr.trim();
+      }
+      
+      // Find the first matching index
+      let foundIdx = -1;
+      for (let i = 0; i < matchData.length; i++) {
+        const val = matchData[i];
+        let matches = false;
+        
+        if (typeof compareValue === 'number' && typeof val === 'number') {
+          switch (operator) {
+            case '==': matches = val === compareValue; break;
+            case '!=': matches = val !== compareValue; break;
+            case '>': matches = val > compareValue; break;
+            case '<': matches = val < compareValue; break;
+            case '>=': matches = val >= compareValue; break;
+            case '<=': matches = val <= compareValue; break;
+          }
+        } else {
+          // String comparison
+          const strVal = String(val);
+          const strCompare = String(compareValue);
+          switch (operator) {
+            case '==': matches = strVal === strCompare; break;
+            case '!=': matches = strVal !== strCompare; break;
+            default: matches = false; // No <, > for strings
+          }
+        }
+        
+        if (matches) {
+          foundIdx = i;
+          break;
+        }
+      }
+      
+      if (foundIdx === -1) {
+        return `Error: No match found for condition '${condition}'`;
+      }
+      
+      const foundValue = returnData[foundIdx];
+      if (outputVar) {
+        // Store as appropriate type
+        if (typeof foundValue === 'number') {
+          analysisVariables.set(outputVar, { name: outputVar, type: 'number', data: foundValue });
+        } else {
+          // For strings, store as a special 'string' type
+          analysisVariables.set(outputVar, { name: outputVar, type: 'number', data: foundValue });
+        }
+        return `Result: ${foundValue} (stored in '${outputVar}')`;
+      }
+      return `Result: ${foundValue}`;
+    }
+    
     // Transformations
     case 'filter': {
       if (!outputVar) return 'Error: filter requires output variable (e.g., filtered_data: filter(...))';
@@ -6730,59 +6887,53 @@ ${tablePreviews}
 ${pilotRequest}
 
 ================================================================================
-## OPERATIONS REFERENCE
+## OPERATIONS REFERENCE (All return single values)
 ================================================================================
 
-### Aggregations (returns single number)
+### Aggregations (column → value)
 variable: sum(data[column])       # Total of all values
 variable: average(data[column])   # Mean value  
 variable: max(data[column])       # Largest value
 variable: min(data[column])       # Smallest value
 variable: count(data[column])     # Number of rows
 
-### Comparisons (returns single number - can use stored variables or columns)
-variable: difference(var1, var2)    # var1 minus var2
-variable: ratio(var1, var2)         # var1 divided by var2
-variable: percentage(var1, var2)    # (var1 / var2) × 100
-variable: pct_change(old, new)      # ((new - old) / old) × 100
+### Arithmetic (value/number, value/number → value)
+variable: add(a, b)               # a + b (can use variables or numbers)
+variable: subtract(a, b)          # a - b
+variable: multiply(a, b)          # a × b
+variable: divide(a, b)            # a ÷ b
 
-### Transformations (returns column, stored in variable)
-variable: filter(data[column], "> 100")   # Rows matching condition
-variable: sort_asc(data[column])          # Sorted ascending
-variable: sort_desc(data[column])         # Sorted descending
+### Percentage Operations (value/number, value/number → value)
+variable: percentage(part, whole) # (part / whole) × 100
+variable: pct_change(old, new)    # ((new - old) / old) × 100
 
-### Arithmetic (returns column, stored in variable)
-variable: add(data[column], 10)           # Add number to each
-variable: subtract(data[column], 5)       # Subtract number from each
-variable: multiply(data[column], 2)       # Multiply each by number
-variable: divide(data[column], 2)         # Divide each by number
-
-### Column Arithmetic (returns column)
-variable: add(data1[col1], data2[col2])        # Add columns
-variable: subtract(data1[col1], data2[col2])   # Subtract columns
+### Lookup (find value based on condition → value)
+variable: lookup(data[return_col], data[match_col], "condition")  # Find value where condition met
 
 ================================================================================
 ## VARIABLE NAMING
 ================================================================================
 
 Use DESCRIPTIVE and UNIQUE names:
-✓ q1_total_revenue, march_average_sales, growth_rate_pct
+✓ q1_total_revenue, march_average_sales, growth_rate_pct, peak_sales_day
 ✗ result, data, temp, var1
 
 ================================================================================
 ## OUTPUT FORMAT
 ================================================================================
 
-Write operations one per line. Add # comment explaining what it computes/stores.
-Focus on computing values - tables/charts will be created separately by another agent.
+Write operations one per line. Add # comment explaining what it computes.
+All operations return single values (numbers or single lookup results).
 
-EXAMPLE (for inventory analysis):
+EXAMPLE (for sales comparison):
 \`\`\`
-warehouse_a_total: sum(inventory_a[quantity])  # Total items in warehouse A
-warehouse_b_total: sum(inventory_b[quantity])  # Total items in warehouse B
-inventory_difference: difference(warehouse_a_total, warehouse_b_total)  # Difference between warehouses
-low_stock_items: filter(inventory_a[quantity], "< 50")  # Items with low stock
-pct_more: percentage(warehouse_a_total, warehouse_b_total)  # Percent difference
+oct_total: sum(october_sales[revenue])           # Total October revenue
+nov_total: sum(november_sales[revenue])          # Total November revenue
+revenue_change: subtract(nov_total, oct_total)   # Difference in revenue
+change_pct: pct_change(oct_total, nov_total)     # Percentage change
+max_oct_sales: max(october_sales[revenue])       # Highest single sale in Oct
+best_oct_day: lookup(october_sales[date], october_sales[revenue], "== max_oct_sales")  # Date of best sale
+combined: add(oct_total, nov_total)              # Total across both months
 \`\`\`
 
 ================================================================================
@@ -7274,6 +7425,222 @@ async function runTwoToolAnalysis(
   sendEvent({ type: 'analysis_complete', summary: summary?.slice(0, 200), availableVars: availableVarsList });
   
   return { report: report || '', summary: summary || '', availableVars: availableVarsList };
+}
+
+// ================================================================================
+// DATA COMPUTE - Runs calculations and returns answers directly (no report)
+// ================================================================================
+
+// Build the Answer Writer prompt (outputs natural language answers, not report)
+function buildAnswerWriterPrompt(
+  tablePreviews: string,
+  questions: string,
+  executionResults: string
+): string {
+  return `# ANSWER WRITER
+
+You answer the Pilot's specific questions using the computed results.
+Output ONLY natural language answers - no display instructions, no reports, no formatting commands.
+
+================================================================================
+## DATA VARIABLES
+================================================================================
+
+${tablePreviews}
+
+================================================================================
+## QUESTIONS TO ANSWER
+================================================================================
+
+${questions}
+
+================================================================================
+## COMPUTED RESULTS (use these to answer the questions)
+================================================================================
+
+${executionResults}
+
+================================================================================
+## YOUR TASK
+================================================================================
+
+Answer each question directly using the computed results above.
+Write your answers in clear, natural language with the actual numbers.
+
+OUTPUT FORMAT:
+Just write the answers. No "REPORT:", no "SUMMARY:", no display instructions.
+Simply answer each question with the computed data.
+
+EXAMPLE:
+Questions: "What is the total sessions for October? What is the total for November? What is the percentage change?"
+Computed: oct_total = 15234, nov_total = 12890, change_percent = -15.4
+
+Your output:
+October total sessions: 15,234
+November total sessions: 12,890
+Percentage change: -15.4% (a decrease of 2,344 sessions from October to November)
+
+================================================================================
+
+Answer the questions now:`;
+}
+
+// Run Data Compute - executes operations and returns natural language answers
+async function runDataCompute(
+  dataRefs: string[],
+  questions: string,
+  pilotVariables: Map<string, any>,
+  model: string,
+  sendEvent: (data: any) => void
+): Promise<{ answers: string; error?: string }> {
+  const client = createOpenRouterClient();
+  
+  // Reset analysis variables
+  resetAnalysisVariables();
+  
+  // Build table previews
+  let tablePreviews = '';
+  const referencedVars: string[] = [];
+  
+  for (const ref of dataRefs) {
+    const varName = ref.includes('[') ? ref.split('[')[0] : ref;
+    if (!referencedVars.includes(varName)) {
+      referencedVars.push(varName);
+    }
+  }
+  
+  for (const varName of referencedVars) {
+    const pilotVar = pilotVariables.get(varName);
+    if (pilotVar) {
+      tablePreviews += buildTablePreview(varName, pilotVar) + '\n\n';
+    }
+  }
+  
+  console.log(`\n${'═'.repeat(80)}`);
+  console.log(`🔢 DATA COMPUTE`);
+  console.log(`${'═'.repeat(80)}`);
+  console.log(`Questions: ${questions}`);
+  console.log(`Variables: ${referencedVars.join(', ')}`);
+  
+  sendEvent({ type: 'compute_started', questions, variables: referencedVars });
+  
+  // ==========================================
+  // TOOL 1: Execution Planner (same as before)
+  // ==========================================
+  console.log(`\n${'─'.repeat(40)}`);
+  console.log(`📋 TOOL 1: EXECUTION PLANNER`);
+  console.log(`${'─'.repeat(40)}`);
+  
+  sendEvent({ type: 'compute_phase', phase: 'planning' });
+  
+  const plannerPrompt = buildExecutionPlannerPrompt(tablePreviews, questions);
+  
+  let plannerOutput = '';
+  try {
+    const plannerResponse = await retryLLMCall(
+      () => client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: plannerPrompt },
+          { role: 'user', content: 'Write your operations now:' }
+        ],
+        temperature: 0.3
+      }),
+      (res) => res.choices[0]?.message?.content || '',
+      'Execution Planner (Compute)'
+    );
+    plannerOutput = plannerResponse.choices[0]?.message?.content || '';
+  } catch (error: any) {
+    console.error(`[Execution Planner] Error:`, error.message);
+    return { answers: '', error: error.message };
+  }
+  
+  console.log(`\n📝 PLANNER OUTPUT:\n${plannerOutput}\n`);
+  
+  sendEvent({ type: 'compute_step', step: plannerOutput });
+  
+  // Parse operations
+  const operations = parseExecutionPlan(plannerOutput);
+  console.log(`\n✅ Parsed ${operations.length} operations`);
+  
+  if (operations.length === 0) {
+    return { answers: '', error: 'No operations parsed from planner' };
+  }
+  
+  // ==========================================
+  // Execute Operations (same as before)
+  // ==========================================
+  console.log(`\n${'─'.repeat(40)}`);
+  console.log(`⚙️ EXECUTING OPERATIONS`);
+  console.log(`${'─'.repeat(40)}`);
+  
+  sendEvent({ type: 'compute_phase', phase: 'executing' });
+  
+  const results = await executeExecutionPlan(operations, pilotVariables, sendEvent);
+  
+  console.log(`\n✅ Executed ${results.length} operations`);
+  for (const r of results) {
+    if (r.error) {
+      console.log(`   ❌ ${r.varName}: ${r.error}`);
+    } else if (r.resultType === 'number') {
+      console.log(`   📊 ${r.varName} = ${r.value}`);
+    } else if (r.resultType === 'column') {
+      console.log(`   📦 ${r.varName} (column: ${r.count} values)`);
+    } else if (r.resultType === 'table') {
+      console.log(`   📋 ${r.varName} (table: ${r.count} rows)`);
+    }
+  }
+  
+  // Build context for Answer Writer
+  const executionResultsContext = buildExecutionResultsContext(results);
+  
+  // ==========================================
+  // TOOL 2: Answer Writer (replaces Report Writer)
+  // ==========================================
+  console.log(`\n${'═'.repeat(80)}`);
+  console.log(`✍️ TOOL 2: ANSWER WRITER`);
+  console.log(`${'═'.repeat(80)}`);
+  console.log(`\n📥 INPUT TO ANSWER WRITER:`);
+  console.log(`${'─'.repeat(40)}`);
+  console.log(`Questions: "${questions}"`);
+  console.log(`\nExecution Results Available:`);
+  console.log(executionResultsContext.split('\n').map(l => `   ${l}`).join('\n'));
+  console.log(`${'─'.repeat(40)}\n`);
+  
+  sendEvent({ type: 'compute_phase', phase: 'answering' });
+  
+  const answerPrompt = buildAnswerWriterPrompt(tablePreviews, questions, executionResultsContext);
+  
+  let answerOutput = '';
+  try {
+    const answerResponse = await retryLLMCall(
+      () => client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: answerPrompt },
+          { role: 'user', content: 'Answer the questions now:' }
+        ],
+        temperature: 0.3
+      }),
+      (res) => res.choices[0]?.message?.content || '',
+      'Answer Writer'
+    );
+    answerOutput = answerResponse.choices[0]?.message?.content || '';
+  } catch (error: any) {
+    console.error(`[Answer Writer] Error:`, error.message);
+    return { answers: '', error: error.message };
+  }
+  
+  console.log(`\n${'═'.repeat(80)}`);
+  console.log(`📤 ANSWER WRITER OUTPUT`);
+  console.log(`${'═'.repeat(80)}`);
+  console.log(answerOutput);
+  console.log(`${'═'.repeat(80)}\n`);
+  
+  sendEvent({ type: 'compute_complete', answers: answerOutput.slice(0, 300) });
+  
+  // Return answers directly (no parsing, no modification)
+  return { answers: answerOutput };
 }
 
 // ================================================================================
@@ -9200,26 +9567,25 @@ You are a Query Orchestrator. Your job is to take a user's request and create a 
 ### Data Retrieval Tools
 ${toolSummaries}
 
-### Processing Tools
-• report - Creates ONE FOCUSED analysis report with calculations only. Outputs a REPORT variable and DETAILED SUMMARY with all calculated values.
-  IMPORTANT: Break analysis into MULTIPLE focused reports. The Pilot receives a detailed summary to formulate insights.
-• add_insight - Pilot adds interpretive insights to a report AFTER seeing the summary. Pilot provides: report variable, title, insight text.
-• extractor - Extract specific values from data (e.g., find a specific ID from a list)
+### Processing Tools (via DATA Agent)
+• compute - Runs calculations on data variables and answers specific questions.
+  The Pilot asks specific questions → gets direct answers back.
+  Operations: sum, average, min, max, count, add, subtract, multiply, divide, percentage, pct_change, lookup.
+• extractor - Extract specific values from data (e.g., find a specific ID from a list). Stores result in a variable.
 
 ### Display Tools
-• display_report - Render an analysis report (tables, charts, cards) to the canvas. Call AFTER adding insights.
 • table - Display data as a table with columns
 • line-chart - Display trends over time as a line chart
-• card - Display text/markdown content
+• card - Display text/markdown content (for findings and insights)
 • alert - Display important notices
 
 ### Key Constraints
 - Tools often have DEPENDENCIES (e.g., need account_id from list_accounts before calling get_report)
 - The Pilot can only execute ONE step at a time
 - The Pilot cannot see raw data values, only variable names and schemas
-- Calculations must be done via the report tool, interpretations via add_insight
-- CRITICAL WORKFLOW: Create report (calculations) → Pilot reviews detailed summary → Pilot adds insight → Display report
-- The Pilot formulates insights based on the summary data - the report tool does NOT generate interpretations
+- Calculations must be done via the compute tool
+- CRITICAL WORKFLOW: Fetch data → Ask specific questions via compute → Pilot receives answers → Pilot displays findings using card/table/chart
+- The Pilot formulates insights based on the answer data - the compute tool does NOT generate interpretations
 
 ================================================================================
 ## OUTPUT FORMAT
@@ -9298,16 +9664,14 @@ Phase 1: Data Collection
 - Fetch sales report for Q3 2025
 - Fetch sales report for Q4 2025
 
-Phase 2: Analysis & Display (create report → add insight → display)
-- Create revenue_totals report: Calculate total revenue per quarter and percentage change
-- Pilot reviews summary (e.g., "Q3: $45K, Q4: $52K, +15.5%")
-- Pilot adds insight explaining WHY (e.g., "Q4 growth driven by holiday promotions")
-- Display the report with insight
-- Repeat for: top_products report, metrics_comparison report
+Phase 2: Analysis
+- Ask compute: Using q3_sales and q4_sales, answer: What is the total revenue for Q3? What is total revenue for Q4? What is the percentage change? What are the top 3 products by revenue in each quarter?
+- Pilot receives direct answers with all calculated values
 
-Phase 3: Response
-- After all reports with insights are displayed, REPLY summarizing
-- Reference the insights already shown on canvas
+Phase 3: Display & Response
+- Create card with findings and Pilot's interpretation of WHY the change happened
+- Create table showing key metrics comparison
+- REPLY summarizing findings and insights
 
 NOTES FOR PILOT:
 - Q3 2025 is 2025-07-01 to 2025-09-30
@@ -9508,7 +9872,7 @@ function cleanPilotOutput(rawOutput: string): { tag: 'EXECUTOR' | 'DATA' | 'REPL
 }
 
 // ================================================================================
-// DATA AGENT - Handles analysis (report) and extraction (extractor) tools
+// DATA AGENT - Handles computation (compute) and extraction (extractor) tools
 // ================================================================================
 
 // Build the Data Agent's system prompt (similar to Executor)
@@ -9518,7 +9882,7 @@ function buildDataAgentPrompt(
 ): string {
   return `# DATA AGENT
 
-You translate the Pilot's natural language instructions into actual tool calls for data analysis and extraction.
+You translate the Pilot's natural language instructions into actual tool calls for data computation and extraction.
 
 ================================================================================
 ## TASK FROM PILOT (Natural Language)
@@ -9530,32 +9894,32 @@ ${task}
 ## YOUR JOB
 ================================================================================
 
-1. Understand what the Pilot wants (they speak in natural language)
+1. Understand what the Pilot wants (they ask specific questions in natural language)
 2. Translate it into the proper tool call syntax
-3. Figure out which variables to use and how to access them
-4. Execute ONE tool call (either report or extractor)
+3. Figure out which variables to use
+4. Execute ONE tool call (either compute or extractor)
 
 The Pilot says things like:
 - "Extract the property ID for vibefam from the properties data. Store in prop_id." → You write: prop_id: extractor(data: [properties[display_name], properties[property_id]], extract: "find the property_id for vibefam")
-- "Analyze october_traffic and november_traffic. Calculate total sessions per month. Store in traffic_comparison." → You write: traffic_comparison: report(data: [october_traffic, november_traffic], question: "Calculate total sessions per month and percentage change")
+- "Using october_traffic and november_traffic, answer: What is the total sessions for October? What is the total for November? What is the percentage change?" → You write: compute(data: [october_traffic, november_traffic], questions: "What is the total sessions for October? What is the total for November? What is the percentage change?")
 
 ================================================================================
 ## TOOL DOCUMENTATION
 ================================================================================
 
-### report (Data Analysis)
-Creates analysis reports from data variables.
+### compute (Data Computation)
+Runs calculations on data variables and answers specific questions. Does NOT store in a variable - returns answers directly.
 
 Syntax:
-\`variable_name: report(data: [var1, var2, ...], question: "what to analyze")\`
+\`compute(data: [var1, var2, ...], questions: "specific questions to answer")\`
 
 Example:
-\`traffic_comparison: report(data: [october_traffic, november_traffic], question: "Calculate total sessions for each month and percentage change")\`
+\`compute(data: [october_traffic, november_traffic], questions: "What is the total sessions for October? What is the total sessions for November? What is the percentage change?")\`
 
-The report tool can: sum, average, max, min, count, compare, percentages, filter, sort, correlations.
+The compute tool can: sum, average, max, min, count, compare, percentages, percentage change, filter, sort, group by, correlations, rankings.
 
 ### extractor (Value Extraction)
-Extracts specific values from data variables.
+Extracts specific values from data variables. Stores result in a variable.
 
 Syntax:
 \`variable_name: extractor(data: [var[field1], var[field2], ...], extract: "what to extract")\`
@@ -9573,17 +9937,14 @@ ${variablesContext || '(No variables yet)'}
 ## SYNTAX REFERENCE
 ================================================================================
 
-Store result in variable:
-\`variable_name: tool_name(arg: value, arg2: value2)\`
-
 Access variable data:
 \`variable_name[field_name]\`
 
-For report (use natural language for question):
-\`result: report(data: [var1, var2], question: "natural language description of analysis")\`
+For compute (answers questions, no variable storage):
+\`compute(data: [var1, var2], questions: "specific questions to answer")\`
 
-For extractor (use natural language for extract):
-\`result: extractor(data: [var[field1], var[field2]], extract: "natural language description of what to extract")\`
+For extractor (stores result in variable):
+\`result: extractor(data: [var[field1], var[field2]], extract: "what to extract")\`
 
 ================================================================================
 ## YOUR OUTPUT
@@ -9633,7 +9994,7 @@ async function runDataAgent(
   sendEvent({
     type: 'data_agent_started',
     task: instructions.slice(0, 200),
-    tools: ['report', 'extractor']
+    tools: ['compute', 'extractor']
   });
   
   const systemPrompt = buildDataAgentPrompt(instructions, variablesContext);
@@ -9703,24 +10064,23 @@ async function runDataAgent(
     // Execute the tool
     // ========================================================================
     
-    if (call.toolName === 'report') {
-      // Report tool - Data Analysis
-      console.log(`\n[Data Agent] Executing REPORT tool`);
-      console.log(`[Data Agent] Variable name: ${call.variableName}`);
+    if (call.toolName === 'compute') {
+      // Compute tool - runs calculations and returns answers directly (no variable storage)
+      console.log(`\n[Data Agent] Executing COMPUTE tool`);
       console.log(`[Data Agent] Args: ${JSON.stringify(call.args)}`);
       
-      // Parse the data and question from args
+      // Parse the data and questions from args
       let dataStr = '';
-      let questionStr = '';
+      let questionsStr = '';
       
       if (typeof call.args === 'string') {
         const dataMatch = call.args.match(/data:\s*\[([^\]]+)\]/);
         if (dataMatch) dataStr = dataMatch[1];
-        const questionMatch = call.args.match(/question:\s*["']([^"']+)["']/);
-        if (questionMatch) questionStr = questionMatch[1];
+        const questionsMatch = call.args.match(/questions:\s*["']([^"']+)["']/);
+        if (questionsMatch) questionsStr = questionsMatch[1];
       } else if (typeof call.args === 'object') {
         dataStr = String(call.args.data || '');
-        questionStr = call.args.question || '';
+        questionsStr = call.args.questions || call.args.question || '';
       }
       
       // Extract variable references
@@ -9733,57 +10093,41 @@ async function runDataAgent(
       }
       
       console.log(`[Data Agent] Data refs: ${parsedRefs.join(', ')}`);
-      console.log(`[Data Agent] Question: ${questionStr}`);
+      console.log(`[Data Agent] Questions: ${questionsStr}`);
       
       sendEvent({
         type: 'data_agent_tool_calling',
-        tool: 'report',
+        tool: 'compute',
         dataRefs: parsedRefs,
-        question: questionStr
+        questions: questionsStr
       });
       
-      // Call the Data Analysis system
-      const analysisResult = await runDataAnalysis(
+      // Call the Data Computation system (returns answers, not report)
+      const computeResult = await runDataCompute(
         parsedRefs,
-        questionStr || instructions,
+        questionsStr || instructions,
         variables,
         model,
         sendEvent
       );
       
-      if (analysisResult.error) {
-        console.log(`\n❌ ANALYSIS ERROR: ${analysisResult.error}`);
-        sendEvent({ type: 'data_agent_tool_error', tool: 'report', error: analysisResult.error });
-        return { success: false, report: `Analysis failed: ${analysisResult.error}`, newVariables };
+      if (computeResult.error) {
+        console.log(`\n❌ COMPUTE ERROR: ${computeResult.error}`);
+        sendEvent({ type: 'data_agent_tool_error', tool: 'compute', error: computeResult.error });
+        return { success: false, report: `Computation failed: ${computeResult.error}`, newVariables };
       }
       
-      // Store the report in the variable
-      const variableName = call.variableName || 'analysis_report';
-      variables.set(variableName, {
-        name: variableName,
-        schema: {
-          report: { description: 'Full analysis report with display instructions', data_type: 'string' },
-          summary: { description: 'Detailed summary of findings', data_type: 'string' }
-        },
-        actualData: {
-          report: analysisResult.report,
-          summary: analysisResult.summary
-        },
-        description: `Analysis report: ${analysisResult.summary.slice(0, 100)}...`
-      });
-      newVariables.push(variableName);
-      
-      console.log(`\n✅ ANALYSIS STORED IN: ${variableName}`);
+      console.log(`\n✅ COMPUTE COMPLETE - Answers returned directly`);
+      console.log(`Answers: ${computeResult.answers.slice(0, 200)}...`);
       
       sendEvent({
         type: 'data_agent_tool_success',
-        tool: 'report',
-        variable: variableName,
-        schemaKeys: ['report', 'summary'],
-        result: `Stored in '${variableName}'. Available: ${variableName}[report], ${variableName}[summary]`
+        tool: 'compute',
+        answers: computeResult.answers
       });
       
-      report = `Data Analysis complete. Stored in '${variableName}'. Summary: ${analysisResult.summary}`;
+      // Return answers directly to Pilot (no variable storage, no rephrasing)
+      report = computeResult.answers;
     }
     
     else if (call.toolName === 'extractor') {
@@ -9912,7 +10256,7 @@ If extracting multiple fields, return: {"field1": value1, "field2": value2, ...}
       // Unknown tool
       console.log(`[Data Agent] ERROR: Unknown tool ${call.toolName}`);
       sendEvent({ type: 'data_agent_error', error: `Unknown tool: ${call.toolName}` });
-      return { success: false, report: `Unknown tool: ${call.toolName}. Use 'report' for analysis or 'extractor' for extraction.`, newVariables };
+      return { success: false, report: `Unknown tool: ${call.toolName}. Use 'compute' for calculations or 'extractor' for extraction.`, newVariables };
     }
     
     return { success: true, report, newVariables };
