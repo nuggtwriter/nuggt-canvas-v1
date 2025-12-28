@@ -88,7 +88,7 @@ cp template.env .env
 Edit your `.env` file with your API key:
 
 ```env
-# Required: Anthropic API Key for Claude Sonnet 4
+# Required: Anthropic API Key for Claude Sonnet 4.5
 # Get your key at: https://console.anthropic.com/
 ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxx
 
