@@ -333,7 +333,7 @@ Click the **Learn MCPs** button in the UI to:
 │                    Backend (Express)                     │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
 │  │  Claude     │  │    MCP      │  │   Nuggt     │     │
-│  │  Sonnet 4   │  │   Manager   │  │   Prompts   │     │
+│  │  Sonnet     │  │   Manager   │  │   Prompts   │     │
 │  └─────────────┘  └─────────────┘  └─────────────┘     │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -379,7 +379,6 @@ MIT License - feel free to use this in your own projects!
 
 ## 🙏 Acknowledgments
 
-- Built with [Claude Sonnet 4](https://anthropic.com) by Anthropic
 - UI components styled with [shadcn/ui](https://ui.shadcn.com)
 - Charts powered by [Recharts](https://recharts.org)
 
