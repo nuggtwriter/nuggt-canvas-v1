@@ -2,7 +2,7 @@
   "mcpName": "analytics-mcp",
   "version": "1.0",
   "learnedAt": "2025-12-03T09:22:16.447Z",
-  "modelUsed": "claude-sonnet-4",
+  "modelUsed": "claude-sonnet-4-5",
   "originalTools": [
     {
       "name": "analytics-mcp__get_account_summaries",
