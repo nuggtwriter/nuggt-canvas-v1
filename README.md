@@ -11,6 +11,8 @@
 
 ---
 
+https://github.com/user-attachments/assets/7a5363d2-5a04-493d-967c-afefaff676eb
+
 ## 💭 The Problem with Chatbots
 
 Let's be honest: **the chatbot interface for LLMs is kind of dull.**
